@@ -6,7 +6,7 @@ from typing import Dict, List, Any, Optional
 from pathlib import Path
 import logging
 
-from flows.plugin_core.metadata.models import (
+from core.models import (
     DAGConfiguration,
     TaskConfiguration,
     TaskDependency

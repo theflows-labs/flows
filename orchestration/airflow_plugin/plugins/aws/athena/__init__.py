@@ -28,7 +28,7 @@ Example Usage:
 For detailed parameter documentation, see the individual operator factory classes.
 """
 
-from flows.plugins.aws.athena.operators.athena_query import AthenaQueryOperatorFactory
+from orchestration.airflow_plugin.plugins.aws.athena.operators.athena_query import AthenaQueryOperatorFactory
 #from flows.plugins.aws.athena.hooks.athena_hook import AthenaHook
 
 # Export operators and hooks

@@ -1,7 +1,7 @@
 """
 Constants package for theflows.
 """
-from flows.plugin_core.constants.database import ( 
+from config.database import ( 
     DB_USER,
     DB_PASSWORD,
     DB_HOST,

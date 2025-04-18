@@ -32,7 +32,7 @@ Example Usage:
 For detailed parameter documentation, see the individual operator factory classes.
 """
 
-from flows.plugins.aws.s3.operators.s3_operations import (
+from orchestration.airflow_plugin.plugins.aws.s3.operators.s3_operations import (
     S3CopyObjectOperatorFactory,
     S3DeleteObjectsOperatorFactory,
     S3PutObjectOperatorFactory,

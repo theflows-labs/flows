@@ -1,13 +1,13 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from flows.plugin_core.metadata.models import DAGConfiguration, TaskConfiguration, TaskDependency
+from core.models import DAGConfiguration, TaskConfiguration, TaskDependency
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 import json
 from datetime import datetime
 
-from ..constants import SQLALCHEMY_CONN
+from config.database import SQLALCHEMY_CONN
 
 class DAGConfigurationRepository:
     def __init__(self):

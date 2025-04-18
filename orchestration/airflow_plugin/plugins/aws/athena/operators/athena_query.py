@@ -11,8 +11,8 @@ import logging
 from airflow.models import BaseOperator
 from airflow.providers.amazon.aws.operators.athena import AthenaOperator
 
-from flows.plugin_core.dag_builder.base import OperatorFactory
-from flows.plugin_core.metadata.models import TaskConfiguration
+from orchestration.airflow_plugin.plugin_core.dag_builder.base import OperatorFactory
+from core.models import TaskConfiguration
 
 logger = logging.getLogger(__name__)
 

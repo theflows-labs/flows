@@ -7,9 +7,9 @@ from pathlib import Path
 from airflow import DAG
 from airflow.models import BaseOperator
 
-from flows.plugin_core.dag_builder.base import DAGBuilder, OperatorFactory
-from flows.plugin_core.dag_builder.yaml_loader import YAMLConfigurationLoader
-from flows.plugin_core.dag_builder.registry import OperatorRegistry
+from orchestration.airflow_plugin.plugin_core.dag_builder.base import DAGBuilder, OperatorFactory
+from orchestration.airflow_plugin.plugin_core.dag_builder.yaml_loader import YAMLConfigurationLoader
+from orchestration.airflow_plugin.plugin_core.dag_builder.registry import OperatorRegistry
 
 class YAMLDAGBuilder(DAGBuilder):
     """Builder for creating Airflow DAGs from YAML configuration."""

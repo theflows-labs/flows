@@ -13,8 +13,8 @@ from airflow.providers.amazon.aws.operators.s3 import (
     S3ListOperator
 )
 
-from flows.plugin_core.dag_builder.base import OperatorFactory
-from flows.plugin_core.metadata.models import TaskConfiguration
+from orchestration.airflow_plugin.plugin_core.dag_builder.base import OperatorFactory
+from core.models import TaskConfiguration
 
 logger = logging.getLogger(__name__)
 

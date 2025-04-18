@@ -4,7 +4,7 @@ Airflow plugin for loading DAGs from the database.
 from airflow.plugins_manager import AirflowPlugin
 from airflow.models import DagBag
 
-from flows.plugin_core.dag_builder.loader import DAGLoader
+from orchestration.airflow_plugin.plugin_core.dag_builder.loader import DAGLoader
 
 class TheFlowsPlugin(AirflowPlugin):
     """Airflow plugin for loading DAGs from the database."""
