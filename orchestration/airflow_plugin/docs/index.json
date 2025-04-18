@@ -1,0 +1,29 @@
+{
+  "operators": [
+    {
+      "task_type": "athena_query",
+      "factory_class": "AthenaQueryOperatorFactory",
+      "description": "Factory for creating Athena query operators."
+    },
+    {
+      "task_type": "s3_copy",
+      "factory_class": "S3CopyObjectOperatorFactory",
+      "description": "Factory for creating S3 copy object operators."
+    },
+    {
+      "task_type": "s3_delete",
+      "factory_class": "S3DeleteObjectsOperatorFactory",
+      "description": "Factory for creating S3 delete objects operators."
+    },
+    {
+      "task_type": "s3_list",
+      "factory_class": "S3ListOperatorFactory",
+      "description": "Factory for creating S3 list operators."
+    },
+    {
+      "task_type": "s3_put",
+      "factory_class": "S3PutObjectOperatorFactory",
+      "description": "Factory for creating S3 put object operators."
+    }
+  ]
+}

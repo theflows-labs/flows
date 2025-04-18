@@ -1,0 +1,34 @@
+{
+  "task_type": "s3_list",
+  "factory_class": "S3ListOperatorFactory",
+  "description": "Factory for creating S3 list operators.",
+  "parameters": {
+    "bucket": {
+      "required": true,
+      "type": "<class 'str'>",
+      "description": "Name of the S3 bucket to list",
+      "example": "my-bucket"
+    },
+    "prefix": {
+      "required": false,
+      "type": "<class 'str'>",
+      "default": "",
+      "description": "Prefix to filter objects",
+      "example": "path/to/files/"
+    },
+    "delimiter": {
+      "required": false,
+      "type": "<class 'str'>",
+      "default": "",
+      "description": "Delimiter to use for object grouping",
+      "example": "/"
+    },
+    "aws_conn_id": {
+      "required": false,
+      "type": "<class 'str'>",
+      "default": "aws_default",
+      "description": "The Airflow connection ID for AWS credentials",
+      "example": "aws_default"
+    }
+  }
+}

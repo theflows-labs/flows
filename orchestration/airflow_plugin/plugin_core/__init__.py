@@ -1,0 +1,3 @@
+"""
+Airflow Plugin Core package.
+"""

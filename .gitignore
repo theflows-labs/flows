@@ -1,0 +1,103 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+build/
+dist/
+out/
+
+# Misc
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+
+# Database
+*.db
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+flows/orchestration/plugins/*/__pycache__/
+flows/orchestration/plugins/*/*.pyc
+flows/orchestration/plugins/*/*.pyo
+flows/orchestration/plugins/*/*.pyd
+flows/orchestration/plugins/*/.Python
+flows/orchestration/plugins/*/build/
+flows/orchestration/plugins/*/develop-eggs/
+flows/orchestration/plugins/*/dist/
+flows/orchestration/plugins/*/downloads/
+flows/orchestration/plugins/*/eggs/
+flows/orchestration/plugins/*/.eggs/
+flows/orchestration/plugins/*/lib/
+flows/orchestration/plugins/*/lib64/
+flows/orchestration/plugins/*/parts/
+flows/orchestration/plugins/*/sdist/
+flows/orchestration/plugins/*/var/
+flows/orchestration/plugins/*/wheels/
+flows/orchestration/plugins/*/*.egg-info/
+flows/orchestration/plugins/*/.installed.cfg
+flows/orchestration/plugins/*/*.egg 

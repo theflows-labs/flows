@@ -1,0 +1,47 @@
+{
+  "task_type": "s3_copy",
+  "factory_class": "S3CopyObjectOperatorFactory",
+  "description": "Factory for creating S3 copy object operators.",
+  "parameters": {
+    "source_bucket_key": {
+      "required": true,
+      "type": "<class 'str'>",
+      "description": "The key of the source object to copy",
+      "example": "path/to/source/file.txt"
+    },
+    "dest_bucket_key": {
+      "required": true,
+      "type": "<class 'str'>",
+      "description": "The key of the destination object",
+      "example": "path/to/destination/file.txt"
+    },
+    "source_bucket_name": {
+      "required": false,
+      "type": "<class 'str'>",
+      "default": null,
+      "description": "Name of the source bucket",
+      "example": "my-source-bucket"
+    },
+    "dest_bucket_name": {
+      "required": false,
+      "type": "<class 'str'>",
+      "default": null,
+      "description": "Name of the destination bucket",
+      "example": "my-dest-bucket"
+    },
+    "aws_conn_id": {
+      "required": false,
+      "type": "<class 'str'>",
+      "default": "aws_default",
+      "description": "The Airflow connection ID for AWS credentials",
+      "example": "aws_default"
+    },
+    "verify": {
+      "required": false,
+      "type": "<class 'bool'>",
+      "default": null,
+      "description": "Whether to verify SSL certificates",
+      "example": true
+    }
+  }
+}

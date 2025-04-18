@@ -1,0 +1,44 @@
+dags:
+  example_dag:
+    description: "An example DAG with multiple tasks"
+    is_active: true
+    config:
+      schedule_interval: "0 0 * * *"
+      start_date: "2024-01-01"
+      catchup: false
+      max_active_runs: 1
+      default_args:
+        owner: "airflow"
+    
+    tasks:
+      task_1:
+        type: "s3_list"
+        is_active: true
+        config:
+          bucket: "test-bucket"
+          
+      
+      task_2:
+        type: "s3_list"
+        is_active: true
+        config:
+          bucket: "test-bucket"
+          
+      
+      task_3:
+        type: "s3_list"
+        is_active: true
+        config:
+          bucket: "test-bucket"
+          
+    
+    dependencies:
+      - task_id: "task_2"
+        depends_on_task_id: "task_1"
+        type: "success"
+        is_active: true
+      
+      - task_id: "task_3"
+        depends_on_task_id: "task_2"
+        type: "success"
+        is_active: true 

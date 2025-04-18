@@ -1,0 +1,6 @@
+{
+  "task_type": "s3_put",
+  "factory_class": "S3PutObjectOperatorFactory",
+  "description": "Factory for creating S3 put object operators.",
+  "parameters": {}
+}

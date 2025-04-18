@@ -1,0 +1,6 @@
+{
+  "task_type": "s3_delete",
+  "factory_class": "S3DeleteObjectsOperatorFactory",
+  "description": "Factory for creating S3 delete objects operators.",
+  "parameters": {}
+}

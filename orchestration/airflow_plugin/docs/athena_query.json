@@ -1,0 +1,93 @@
+{
+  "task_type": "athena_query",
+  "factory_class": "AthenaQueryOperatorFactory",
+  "description": "Factory for creating Athena query operators.",
+  "parameters": {
+    "query": {
+      "required": true,
+      "type": "<class 'str'>",
+      "description": "The SQL query to execute in Athena",
+      "example": "SELECT * FROM my_table LIMIT 10"
+    },
+    "database": {
+      "required": true,
+      "type": "<class 'str'>",
+      "description": "The name of the database to execute the query in",
+      "example": "my_database"
+    },
+    "output_location": {
+      "required": true,
+      "type": "<class 'str'>",
+      "description": "The S3 path where query results will be stored",
+      "example": "s3://my-bucket/query-results/"
+    },
+    "aws_conn_id": {
+      "required": false,
+      "type": "<class 'str'>",
+      "default": "aws_default",
+      "description": "The Airflow connection ID for AWS credentials",
+      "example": "aws_default"
+    },
+    "region_name": {
+      "required": false,
+      "type": "<class 'str'>",
+      "default": "us-east-1",
+      "description": "The AWS region where Athena is running",
+      "example": "us-east-1"
+    },
+    "workgroup": {
+      "required": false,
+      "type": "<class 'str'>",
+      "default": "primary",
+      "description": "The Athena workgroup to use for query execution",
+      "example": "primary"
+    },
+    "query_execution_context": {
+      "required": false,
+      "type": "<class 'dict'>",
+      "default": null,
+      "description": "Additional context for query execution",
+      "example": {
+        "Database": "my_database",
+        "Catalog": "AwsDataCatalog"
+      }
+    },
+    "result_configuration": {
+      "required": false,
+      "type": "<class 'dict'>",
+      "default": null,
+      "description": "Configuration for query results",
+      "example": {
+        "OutputLocation": "s3://my-bucket/query-results/"
+      }
+    },
+    "client_request_token": {
+      "required": false,
+      "type": "<class 'str'>",
+      "default": null,
+      "description": "Unique token to ensure idempotency",
+      "example": "unique-token-123"
+    },
+    "sleep_time": {
+      "required": false,
+      "type": "<class 'int'>",
+      "default": 30,
+      "description": "Time to wait between polling for query completion",
+      "example": 30
+    },
+    "max_tries": {
+      "required": false,
+      "type": "<class 'int'>",
+      "default": null,
+      "description": "Maximum number of attempts to check query status",
+      "example": 3
+    },
+    "check_interval": {
+      "required": false,
+      "type": "<class 'int'>",
+      "default": 30,
+      "description": "Interval between status checks in seconds",
+      "example": 30
+    }
+  }
+}
