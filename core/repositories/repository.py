@@ -1,36 +1,36 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from core.models import DAGConfiguration, TaskConfiguration, TaskDependency
+from core.models import FlowConfiguration, TaskConfiguration, TaskDependency, FlowExecution, TaskExecution
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 import json
 from datetime import datetime
+from enum import Enum
 
 from config.database import SQLALCHEMY_CONN
 
-class DAGConfigurationRepository:
+class FlowConfigurationRepository:
     def __init__(self):
         # Initialize database connection
         self.engine = create_engine(SQLALCHEMY_CONN)
         self.Session = sessionmaker(bind=self.engine)
 
-    def create_dag_config(self, dag_id: str, config_details: Dict[str, Any], description: Optional[str] = None) -> DAGConfiguration:
-        """Create a new DAG configuration."""
+    def create_flow_config(self, flow_id: str, config_details: Dict[str, Any], config_details_yaml: Optional[str] = None, description: Optional[str] = None) -> FlowConfiguration:
+        """Create a new Flow configuration."""
         session = self.Session()
         try:
-            # Convert dictionary to JSON string
-            config_json = json.dumps(config_details, default=self._json_serializer)
-            dag_config = DAGConfiguration(
-                dag_id=dag_id,
-                config_details=config_json,
+            flow_config = FlowConfiguration(
+                flow_id=flow_id,
+                config_details=config_details,
+                config_details_yaml=config_details_yaml,
                 description=description,
                 is_active=True
             )
-            session.add(dag_config)
+            session.add(flow_config)
             session.commit()
-            session.refresh(dag_config)
-            return dag_config
+            session.refresh(flow_config)
+            return flow_config
         finally:
             session.close()
 
@@ -40,57 +40,57 @@ class DAGConfigurationRepository:
             return obj.isoformat()
         raise TypeError(f"Type {type(obj)} not serializable")
 
-    def get_dag_config(self, config_id: int) -> Optional[DAGConfiguration]:
-        """Get a DAG configuration by ID."""
+    def get_flow_config(self, config_id: int) -> Optional[FlowConfiguration]:
+        """Get a Flow configuration by ID."""
         session = self.Session()
         try:
-            return session.query(DAGConfiguration).filter(DAGConfiguration.config_id == config_id).first()
+            return session.query(FlowConfiguration).filter(FlowConfiguration.config_id == config_id).first()
         finally:
             session.close()
 
-    def get_dag_config_by_dag_id(self, dag_id: str) -> Optional[DAGConfiguration]:
-        """Get a DAG configuration by DAG ID."""
+    def get_flow_config_by_flow_id(self, flow_id: str) -> Optional[FlowConfiguration]:
+        """Get a Flow configuration by Flow ID."""
         session = self.Session()
         try:
-            return session.query(DAGConfiguration).filter(DAGConfiguration.dag_id == dag_id).first()
+            return session.query(FlowConfiguration).filter(FlowConfiguration.flow_id == flow_id).first()
         finally:
             session.close()
 
-    def update_dag_config(self, config_id: int, config_details: Dict[str, Any], description: Optional[str] = None) -> Optional[DAGConfiguration]:
-        """Update a DAG configuration."""
+    def update_flow_config(self, config_id: int, config_details: Dict[str, Any], config_details_yaml: Optional[str] = None, description: Optional[str] = None) -> Optional[FlowConfiguration]:
+        """Update a Flow configuration."""
         session = self.Session()
         try:
-            dag_config = session.query(DAGConfiguration).filter(DAGConfiguration.config_id == config_id).first()
-            if dag_config:
-                # Convert dictionary to JSON string
-                config_json = json.dumps(config_details, default=self._json_serializer)
-                dag_config.config_details = config_json
+            flow_config = session.query(FlowConfiguration).filter(FlowConfiguration.config_id == config_id).first()
+            if flow_config:
+                flow_config.config_details = config_details
+                if config_details_yaml is not None:
+                    flow_config.config_details_yaml = config_details_yaml
                 if description is not None:
-                    dag_config.description = description
+                    flow_config.description = description
                 session.commit()
-                session.refresh(dag_config)
-            return dag_config
+                session.refresh(flow_config)
+            return flow_config
         finally:
             session.close()
 
-    def delete_dag_config(self, config_id: int) -> bool:
-        """Delete a DAG configuration and its associated tasks."""
+    def delete_flow_config(self, config_id: int) -> bool:
+        """Delete a Flow configuration and its associated tasks."""
         session = self.Session()
         try:
-            dag_config = session.query(DAGConfiguration).filter(DAGConfiguration.config_id == config_id).first()
-            if dag_config:
-                session.delete(dag_config)
+            flow_config = session.query(FlowConfiguration).filter(FlowConfiguration.config_id == config_id).first()
+            if flow_config:
+                session.delete(flow_config)
                 session.commit()
                 return True
             return False
         finally:
             session.close()
 
-    def get_all_active_dag_configs(self) -> List[DAGConfiguration]:
-        """Get all active DAG configurations."""
+    def get_all_active_flow_configs(self) -> List[FlowConfiguration]:
+        """Get all active Flow configurations."""
         session = self.Session()
         try:
-            return session.query(DAGConfiguration).filter_by(is_active=True).all()
+            return session.query(FlowConfiguration).filter_by(is_active=True).all()
         finally:
             session.close()
 
@@ -100,18 +100,19 @@ class TaskConfigurationRepository:
         self.engine = create_engine(SQLALCHEMY_CONN)
         self.Session = sessionmaker(bind=self.engine)
 
-    def create_task_config(self, dag_config_id: int, task_type: str, task_sequence: int, 
-                         config_details: Optional[Dict[str, Any]] = None, description: Optional[str] = None) -> TaskConfiguration:
+    def create_task_config(self, flow_config_id: int, task_type: str, task_sequence: int, 
+                         config_details: Optional[Dict[str, Any]] = None,
+                         config_details_yaml: Optional[str] = None,
+                         description: Optional[str] = None) -> TaskConfiguration:
         """Create a new task configuration."""
         session = self.Session()
         try:
-            # Convert dictionary to JSON string
-            config_json = json.dumps(config_details, default=self._json_serializer)
             task_config = TaskConfiguration(
-                dag_config_id=dag_config_id,
+                flow_config_id=flow_config_id,
                 task_type=task_type,
                 task_sequence=task_sequence,
-                config_details=config_json,
+                config_details=config_details,
+                config_details_yaml=config_details_yaml,
                 description=description,
                 is_active=True
             )
@@ -136,12 +137,12 @@ class TaskConfigurationRepository:
         finally:
             session.close()
 
-    def get_task_configs_by_dag_config(self, dag_config_id: int) -> List[TaskConfiguration]:
-        """Get all task configurations for a DAG configuration."""
+    def get_task_configs_by_flow_config(self, flow_config_id: int) -> List[TaskConfiguration]:
+        """Get all task configurations for a Flow configuration."""
         session = self.Session()
         try:
             return session.query(TaskConfiguration).filter(
-                TaskConfiguration.dag_config_id == dag_config_id
+                TaskConfiguration.flow_config_id == flow_config_id
             ).order_by(TaskConfiguration.task_sequence).all()
         finally:
             session.close()
@@ -186,16 +187,18 @@ class TaskDependencyRepository:
         self.engine = create_engine(SQLALCHEMY_CONN)
         self.Session = sessionmaker(bind=self.engine)
 
-    def create_dependency(self, dag_config_id: int, task_id: int, depends_on_task_id: int, 
-                         dependency_type: str = 'success') -> TaskDependency:
+    def create_dependency(self, flow_config_id: int, task_id: int, depends_on_task_id: int, 
+                         dependency_type: str = 'success',
+                         condition: Optional[str] = None) -> TaskDependency:
         """Create a new task dependency."""
         session = self.Session()
         try:
             dependency = TaskDependency(
-                dag_config_id=dag_config_id,
+                flow_config_id=flow_config_id,
                 task_id=task_id,
                 depends_on_task_id=depends_on_task_id,
                 dependency_type=dependency_type,
+                condition=condition,
                 is_active=True
             )
             session.add(dependency)
@@ -213,24 +216,12 @@ class TaskDependencyRepository:
         finally:
             session.close()
 
-    # def get_dependencies_by_dag_config(self, dag_config_id: int) -> List[TaskDependency]:
-    #     """Get all task dependencies for a DAG configuration."""
-    #     session = self.Session()
-    #     try:
-    #         return session.query(TaskDependency).filter(
-    #             TaskDependency.dag_config_id == dag_config_id,
-    #             TaskDependency.is_active == True
-    #         ).all()
-    #     finally:
-    #         session.close()
-
-    def get_dependencies_by_dag(self, dag_config_id: int) -> List[TaskDependency]:
-        """Get all task dependencies for a DAG configuration."""
+    def get_dependencies_by_flow(self, flow_config_id: int) -> List[TaskDependency]:
+        """Get all dependencies for a Flow configuration."""
         session = self.Session()
         try:
             return session.query(TaskDependency).filter(
-                TaskDependency.dag_config_id == dag_config_id,
-                TaskDependency.is_active == True
+                TaskDependency.flow_config_id == flow_config_id
             ).all()
         finally:
             session.close()
@@ -287,12 +278,12 @@ class TaskDependencyRepository:
         finally:
             session.close()
 
-    def get_task_dependency_graph(self, dag_config_id: int) -> Dict[int, List[int]]:
-        """Get the dependency graph for a DAG as a dictionary of task_id -> [dependent_task_ids]."""
+    def get_task_dependency_graph(self, flow_config_id: int) -> Dict[int, List[int]]:
+        """Get the dependency graph for a Flow as a dictionary of task_id -> [dependent_task_ids]."""
         session = self.Session()
         try:
             dependencies = session.query(TaskDependency).filter(
-                TaskDependency.dag_config_id == dag_config_id,
+                TaskDependency.flow_config_id == flow_config_id,
                 TaskDependency.is_active == True
             ).all()
             
@@ -303,5 +294,104 @@ class TaskDependencyRepository:
                 graph[dep.depends_on_task_id].append(dep.task_id)
             
             return graph
+        finally:
+            session.close()
+
+class FlowExecutionRepository:
+    def __init__(self):
+        self.engine = create_engine(SQLALCHEMY_CONN)
+        self.Session = sessionmaker(bind=self.engine)
+
+    def create_execution(self, flow_config_id: int) -> FlowExecution:
+        """Create a new flow execution."""
+        session = self.Session()
+        try:
+            execution = FlowExecution(
+                flow_config_id=flow_config_id,
+                status=ExecutionStatus.PENDING
+            )
+            session.add(execution)
+            session.commit()
+            session.refresh(execution)
+            return execution
+        finally:
+            session.close()
+
+    def get_execution(self, execution_id: int) -> Optional[FlowExecution]:
+        """Get an execution by ID."""
+        session = self.Session()
+        try:
+            return session.query(FlowExecution).filter(
+                FlowExecution.execution_id == execution_id
+            ).first()
+        finally:
+            session.close()
+
+    def update_execution(self, execution_id: int, status: Optional[str] = None,
+                        result: Optional[Dict] = None, error: Optional[str] = None,
+                        end_time: Optional[datetime] = None) -> Optional[FlowExecution]:
+        """Update an execution."""
+        session = self.Session()
+        try:
+            execution = session.query(FlowExecution).filter(
+                FlowExecution.execution_id == execution_id
+            ).first()
+            if execution:
+                if status:
+                    execution.status = status
+                if result is not None:
+                    execution.result = result
+                if error is not None:
+                    execution.error = error
+                if end_time:
+                    execution.end_time = end_time
+                session.commit()
+                session.refresh(execution)
+            return execution
+        finally:
+            session.close()
+
+class TaskExecutionRepository:
+    def __init__(self):
+        self.engine = create_engine(SQLALCHEMY_CONN)
+        self.Session = sessionmaker(bind=self.engine)
+
+    def create_task_execution(self, flow_execution_id: int, task_id: int) -> TaskExecution:
+        """Create a new task execution."""
+        session = self.Session()
+        try:
+            task_execution = TaskExecution(
+                flow_execution_id=flow_execution_id,
+                task_id=task_id,
+                status=ExecutionStatus.PENDING
+            )
+            session.add(task_execution)
+            session.commit()
+            session.refresh(task_execution)
+            return task_execution
+        finally:
+            session.close()
+
+    def update_task_execution(self, task_execution_id: int, status: Optional[str] = None,
+                            result: Optional[Dict] = None, error: Optional[str] = None,
+                            end_time: Optional[datetime] = None) -> Optional[TaskExecution]:
+        """Update a task execution."""
+        session = self.Session()
+        try:
+            task_execution = session.query(TaskExecution).filter(
+                TaskExecution.task_execution_id == task_execution_id
+            ).first()
+            if task_execution:
+                if status:
+                    task_execution.status = status
+                if result is not None:
+                    task_execution.result = result
+                if error is not None:
+                    task_execution.error = error
+                if end_time:
+                    task_execution.end_time = end_time
+                session.commit()
+                session.refresh(task_execution)
+            return task_execution
         finally:
             session.close() 

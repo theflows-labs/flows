@@ -3,36 +3,36 @@ import axios from 'axios';
 import YAML from 'yaml';
 import { saveFileLocally } from '../utils/fileUtils';
 
-const useDAGStore = create((set) => ({
-  dags: [],
-  selectedDAG: null,
+const useFlowStore = create((set) => ({
+  flows: [],
+  selectedFlow: null,
   loading: false,
   error: null,
 
-  fetchDAGs: async () => {
+  fetchFlows: async () => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('/api/dags');
+      const response = await fetch('/api/flows');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      set({ dags: data, loading: false });
+      set({ flows: data, loading: false });
     } catch (error) {
-      console.error('Error fetching DAGs:', error);
+      console.error('Error fetching flows:', error);
       set({ error: error.message, loading: false });
     }
   },
 
-  saveDAG: async (dagData) => {
+  saveFlow: async (flowData) => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch('/api/dags', {
+      const response = await fetch('/api/flows', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(dagData),
+        body: JSON.stringify(flowData),
       });
 
       if (!response.ok) {
@@ -40,28 +40,28 @@ const useDAGStore = create((set) => ({
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
-      const savedDAG = await response.json();
+      const savedFlow = await response.json();
       set((state) => ({
-        dags: [...state.dags, savedDAG],
+        flows: [...state.flows, savedFlow],
         loading: false,
       }));
-      return savedDAG;
+      return savedFlow;
     } catch (error) {
-      console.error('Error saving DAG:', error);
+      console.error('Error saving flow:', error);
       set({ error: error.message, loading: false });
       throw error;
     }
   },
 
-  updateDAG: async (dagId, dagData) => {
+  updateFlow: async (flowId, flowData) => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch(`/api/dags/${dagId}`, {
+      const response = await fetch(`/api/flows/${flowId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(dagData),
+        body: JSON.stringify(flowData),
       });
 
       if (!response.ok) {
@@ -69,25 +69,25 @@ const useDAGStore = create((set) => ({
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
-      const updatedDAG = await response.json();
+      const updatedFlow = await response.json();
       set((state) => ({
-        dags: state.dags.map((dag) =>
-          dag.id === dagId ? updatedDAG : dag
+        flows: state.flows.map((flow) =>
+          flow.flow_id === flowId ? updatedFlow : flow
         ),
         loading: false,
       }));
-      return updatedDAG;
+      return updatedFlow;
     } catch (error) {
-      console.error('Error updating DAG:', error);
+      console.error('Error updating flow:', error);
       set({ error: error.message, loading: false });
       throw error;
     }
   },
 
-  deleteDAG: async (dagId) => {
+  deleteFlow: async (flowId) => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch(`/api/dags/${dagId}`, {
+      const response = await fetch(`/api/flows/${flowId}`, {
         method: 'DELETE',
       });
 
@@ -97,17 +97,17 @@ const useDAGStore = create((set) => ({
       }
 
       set((state) => ({
-        dags: state.dags.filter((dag) => dag.id !== dagId),
+        flows: state.flows.filter((flow) => flow.flow_id !== flowId),
         loading: false,
       }));
     } catch (error) {
-      console.error('Error deleting DAG:', error);
+      console.error('Error deleting flow:', error);
       set({ error: error.message, loading: false });
       throw error;
     }
   },
 
-  setSelectedDAG: (dag) => set({ selectedDAG: dag }),
+  setSelectedFlow: (flow) => set({ selectedFlow: flow }),
 }));
 
-export default useDAGStore; 
+export default useFlowStore; 

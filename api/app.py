@@ -1,24 +1,46 @@
 from flask import Flask
 from flask_cors import CORS
-from .config.db import engine
-from .models.base import Base
-from .models import dag, task  # This import ensures models are registered with Base
-from .routes import dag_bp, task_bp, execution_bp
+from api.routes import flow_bp, task_bp, execution_bp
+from config.database import (
+    SQLALCHEMY_CONN,
+    SQLALCHEMY_TRACK_MODIFICATIONS,
+    SQLALCHEMY_ENGINE_OPTIONS
+)
 
 def create_app():
+    """Create and configure the Flask application."""
     app = Flask(__name__)
-    CORS(app)
-
-    # Initialize database
-    Base.metadata.create_all(bind=engine)
+    
+    # Configure CORS
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    
+    # Configure SQLAlchemy
+    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_CONN
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = SQLALCHEMY_TRACK_MODIFICATIONS
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = SQLALCHEMY_ENGINE_OPTIONS
 
     # Register blueprints
-    app.register_blueprint(dag_bp, url_prefix='/api/dags')
+    app.register_blueprint(flow_bp, url_prefix='/api/flows')
     app.register_blueprint(task_bp, url_prefix='/api/tasks')
     app.register_blueprint(execution_bp, url_prefix='/api/executions')
 
+    # Error handlers
+    @app.errorhandler(404)
+    def not_found_error(error):
+        return {'error': 'Resource not found'}, 404
+
+    @app.errorhandler(500)
+    def internal_error(error):
+        return {'error': 'Internal server error'}, 500
+
+    @app.errorhandler(ValueError)
+    def value_error(error):
+        return {'error': str(error)}, 400
+
     return app
 
+# Create the application instance
+app = create_app()
+
 if __name__ == '__main__':
-    app = create_app()
-    app.run(debug=True, port=5000) 
+    app.run(debug=True) 

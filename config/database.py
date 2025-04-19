@@ -2,6 +2,7 @@
 Database connection settings for theflows.
 """
 import os
+from typing import Optional
 
 # Database connection settings
 # DB_USER = os.getenv('DB_USER', 'postgress')
@@ -20,4 +21,12 @@ DB_NAME = 'postgress'
 SQLALCHEMY_CONN = f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
 
 # Database schema
-DB_SCHEMA = os.getenv('DB_SCHEMA', 'theflows') 
+DB_SCHEMA = 'theflows'
+
+# SQLAlchemy configuration
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+SQLALCHEMY_ENGINE_OPTIONS = {
+    'pool_size': 10,
+    'max_overflow': 20,
+    'pool_timeout': 30,
+} 

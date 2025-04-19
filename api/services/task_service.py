@@ -1,10 +1,8 @@
-from ..models.task import Task
-from ..config.db import SessionLocal
-import uuid
-from datetime import datetime
-import logging
+from typing import Dict, List, Optional, Any
+from core.repositories.repository import TaskConfigurationRepository
+from core.models.models import TaskConfiguration
+import yaml
 
-logger = logging.getLogger(__name__)
 
 class TaskService:
     # Define available task types and their configurations
@@ -62,105 +60,116 @@ class TaskService:
                 },
                 'required': ['sql', 'conn_id']
             }
+        },
+        'http': {
+            'name': 'HTTP Task',
+            'description': 'Make an HTTP request',
+            'config_schema': {
+                'type': 'object',
+                'properties': {
+                    'url': {
+                        'type': 'string',
+                        'description': 'URL to make request to'
+                    },
+                    'method': {
+                        'type': 'string',
+                        'enum': ['GET', 'POST', 'PUT', 'DELETE'],
+                        'description': 'HTTP method'
+                    }
+                },
+                'required': ['url', 'method']
+            }
+        },
+        'docker': {
+            'name': 'Docker Task',
+            'description': 'Run a Docker container',
+            'config_schema': {
+                'type': 'object',
+                'properties': {
+                    'image': {
+                        'type': 'string',
+                        'description': 'Docker image to run'
+                    },
+                    'command': {
+                        'type': 'string',
+                        'description': 'Command to run in container'
+                    }
+                },
+                'required': ['image']
+            }
         }
     }
 
-    @staticmethod
-    def get_task_types():
-        return TaskService.TASK_TYPES
+    def __init__(self):
+        self.task_repo = TaskConfigurationRepository()
+
+    @classmethod
+    def get_task(cls, task_id: int) -> Optional[Dict[str, Any]]:
+        """Get a task by ID."""
+        service = cls()
+        task = service.task_repo.get_task_config(task_id)
+        if task:
+            return service._task_to_dict(task)
+        return None
+
+    @classmethod
+    def update_task(cls, task_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update a task."""
+        service = cls()
+        
+        # Validate task configuration if provided
+        if 'config_details' in data:
+            task = service.task_repo.get_task_config(task_id)
+            if task and task.task_type in cls.TASK_TYPES:
+                cls._validate_config(
+                    data['config_details'],
+                    cls.TASK_TYPES[task.task_type]['config_schema']
+                )
+
+        # Convert to YAML if not provided
+        yaml_content = data.get('config_details_yaml')
+        if not yaml_content and data.get('config_details'):
+            yaml_content = yaml.dump(data['config_details'], default_flow_style=False)
+
+        task = service.task_repo.update_task_config(
+            task_id=task_id,
+            config_details=data.get('config_details'),
+            config_details_yaml=yaml_content,
+            description=data.get('description')
+        )
+        return service._task_to_dict(task) if task else None
+
+    @classmethod
+    def get_task_types(cls) -> List[Dict[str, Any]]:
+        """Get available task types with their schemas."""
+        return [
+            {
+                'type': task_type,
+                'name': config['name'],
+                'description': config['description'],
+                'config_schema': config['config_schema']
+            }
+            for task_type, config in cls.TASK_TYPES.items()
+        ]
 
     @staticmethod
-    def get_all_tasks():
-        db = SessionLocal()
-        try:
-            return [task.to_dict() for task in db.query(Task).all()]
-        finally:
-            db.close()
+    def _validate_config(config: Dict[str, Any], schema: Dict[str, Any]) -> None:
+        """Validate task configuration against its schema."""
+        properties = schema.get('properties', {})
+        required = schema.get('required', [])
 
-    @staticmethod
-    def get_task(task_id):
-        db = SessionLocal()
-        try:
-            return db.query(Task).filter(Task.id == task_id).first()
-        finally:
-            db.close()
-
-    @staticmethod
-    def get_tasks_by_dag(dag_id):
-        db = SessionLocal()
-        try:
-            return [task.to_dict() for task in db.query(Task).filter(Task.dag_id == dag_id).all()]
-        finally:
-            db.close()
-
-    @staticmethod
-    def create_task(data):
-        db = SessionLocal()
-        try:
-            task = Task(
-                id=str(uuid.uuid4()),
-                dag_id=data.get('dag_id'),
-                type=data['type'],
-                config=data.get('config', {})
-            )
-            
-            db.add(task)
-            db.commit()
-            db.refresh(task)
-            return task
-        finally:
-            db.close()
-
-    @staticmethod
-    def update_task(task_id, data):
-        db = SessionLocal()
-        try:
-            task = db.query(Task).filter(Task.id == task_id).first()
-            if not task:
-                return None
-                
-            task.type = data['type']
-            task.config = data.get('config', {})
-            task.updated_at = datetime.utcnow()
-            
-            db.commit()
-            db.refresh(task)
-            return task
-        finally:
-            db.close()
-
-    @staticmethod
-    def delete_task(task_id):
-        db = SessionLocal()
-        try:
-            task = db.query(Task).filter(Task.id == task_id).first()
-            if task:
-                db.delete(task)
-                db.commit()
-        finally:
-            db.close()
-
-    @staticmethod
-    def delete_tasks_by_dag(dag_id):
-        db = SessionLocal()
-        try:
-            tasks = db.query(Task).filter(Task.dag_id == dag_id).all()
-            for task in tasks:
-                db.delete(task)
-            db.commit()
-        finally:
-            db.close()
-
-    @staticmethod
-    def _validate_config(config, schema):
-        for field, rules in schema.items():
-            if rules.get('required', False) and field not in config:
+        # Check required fields
+        for field in required:
+            if field not in config:
                 raise ValueError(f"Missing required field: {field}")
 
-            if field in config:
-                value = config[field]
-                expected_type = rules['type']
+        # Validate field types and values
+        for field, value in config.items():
+            if field in properties:
+                field_schema = properties[field]
+                expected_type = field_schema['type']
 
+                # Type validation
                 if expected_type == 'string' and not isinstance(value, str):
                     raise ValueError(f"Field {field} must be a string")
                 elif expected_type == 'array' and not isinstance(value, list):
@@ -168,5 +177,22 @@ class TaskService:
                 elif expected_type == 'object' and not isinstance(value, dict):
                     raise ValueError(f"Field {field} must be an object")
 
-                if 'enum' in rules and value not in rules['enum']:
-                    raise ValueError(f"Field {field} must be one of {rules['enum']}") 
+                # Enum validation
+                if 'enum' in field_schema and value not in field_schema['enum']:
+                    raise ValueError(f"Field {field} must be one of {field_schema['enum']}")
+
+    @staticmethod
+    def _task_to_dict(task: TaskConfiguration) -> Dict[str, Any]:
+        """Convert a TaskConfiguration model to a dictionary."""
+        return {
+            'task_id': task.task_id,
+            'task_type': task.task_type,
+            'flow_config_id': task.flow_config_id,
+            'task_sequence': task.task_sequence,
+            'config_details': task.config_details,
+            'config_details_yaml': task.config_details_yaml,
+            'description': task.description,
+            'created_dt': task.created_dt.isoformat() if task.created_dt else None,
+            'updated_dt': task.updated_dt.isoformat() if task.updated_dt else None,
+            'is_active': task.is_active
+        }

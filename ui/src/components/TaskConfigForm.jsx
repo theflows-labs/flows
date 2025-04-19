@@ -1,176 +1,159 @@
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import React, { useState } from 'react';
 import {
   Box,
   TextField,
-  Select,
-  MenuItem,
+  Button,
+  Typography,
+  IconButton,
   FormControl,
   InputLabel,
-  Grid,
+  Select,
+  MenuItem,
+  Paper,
 } from '@mui/material';
+import { Close as CloseIcon } from '@mui/icons-material';
 
-const taskTypes = [
-  { value: 'python', label: 'Python' },
-  { value: 'bash', label: 'Bash' },
-  { value: 's3', label: 'S3' },
-  { value: 'athena', label: 'Athena' },
-];
-
-function TaskConfigForm({ node, onUpdate }) {
-  const { register, handleSubmit, setValue } = useForm({
-    defaultValues: {
-      type: node.data.type,
-      label: node.data.label,
-      ...node.data.config,
-    },
+const TaskConfigForm = ({ node, taskTypes, onUpdate, onClose }) => {
+  const [taskData, setTaskData] = useState({
+    label: node.data.label,
+    type: node.data.type,
+    config: node.data.config,
   });
 
-  const onSubmit = (data) => {
-    onUpdate({
-      type: data.type,
-      label: data.label,
+  const handleChange = (field, value) => {
+    setTaskData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleConfigChange = (field, value) => {
+    setTaskData((prev) => ({
+      ...prev,
       config: {
-        ...data,
-        type: undefined,
-        label: undefined,
+        ...prev.config,
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSubmit = () => {
+    onUpdate({
+      ...node,
+      data: {
+        ...node.data,
+        ...taskData,
       },
     });
   };
 
-  return (
-    <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 2 }}>
-      <Grid container spacing={2}>
-        <Grid item xs={12}>
-          <FormControl fullWidth>
-            <InputLabel>Task Type</InputLabel>
-            <Select
-              {...register('type')}
-              label="Task Type"
-              onChange={(e) => {
-                setValue('type', e.target.value);
-                handleSubmit(onSubmit)();
-              }}
-            >
-              {taskTypes.map((type) => (
-                <MenuItem key={type.value} value={type.value}>
-                  {type.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
-        <Grid item xs={12}>
+  const renderConfigFields = () => {
+    const taskType = taskTypes[taskData.type];
+    if (!taskType) return null;
+
+    const configFields = Object.entries(taskType.defaultConfig);
+    
+    return configFields.map(([field, defaultValue]) => {
+      if (Array.isArray(defaultValue)) {
+        return (
           <TextField
-            {...register('label')}
-            label="Task Label"
+            key={field}
             fullWidth
-            onChange={(e) => {
-              setValue('label', e.target.value);
-              handleSubmit(onSubmit)();
-            }}
+            label={field}
+            value={taskData.config[field]?.join(', ') || ''}
+            onChange={(e) => handleConfigChange(field, e.target.value.split(',').map(s => s.trim()))}
+            margin="normal"
+            helperText={`Enter ${field} separated by commas`}
           />
-        </Grid>
-        {node.data.type === 'python' && (
-          <>
-            <Grid item xs={12}>
-              <TextField
-                {...register('python_callable')}
-                label="Python Callable"
-                fullWidth
-                onChange={(e) => {
-                  setValue('python_callable', e.target.value);
-                  handleSubmit(onSubmit)();
-                }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                {...register('op_kwargs')}
-                label="Operator Arguments (JSON)"
-                fullWidth
-                multiline
-                rows={4}
-                onChange={(e) => {
-                  setValue('op_kwargs', e.target.value);
-                  handleSubmit(onSubmit)();
-                }}
-              />
-            </Grid>
-          </>
-        )}
-        {node.data.type === 'bash' && (
-          <Grid item xs={12}>
-            <TextField
-              {...register('bash_command')}
-              label="Bash Command"
-              fullWidth
-              multiline
-              rows={4}
-              onChange={(e) => {
-                setValue('bash_command', e.target.value);
-                handleSubmit(onSubmit)();
-              }}
-            />
-          </Grid>
-        )}
-        {node.data.type === 's3' && (
-          <>
-            <Grid item xs={12}>
-              <TextField
-                {...register('bucket')}
-                label="S3 Bucket"
-                fullWidth
-                onChange={(e) => {
-                  setValue('bucket', e.target.value);
-                  handleSubmit(onSubmit)();
-                }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                {...register('key')}
-                label="S3 Key"
-                fullWidth
-                onChange={(e) => {
-                  setValue('key', e.target.value);
-                  handleSubmit(onSubmit)();
-                }}
-              />
-            </Grid>
-          </>
-        )}
-        {node.data.type === 'athena' && (
-          <>
-            <Grid item xs={12}>
-              <TextField
-                {...register('query')}
-                label="Athena Query"
-                fullWidth
-                multiline
-                rows={4}
-                onChange={(e) => {
-                  setValue('query', e.target.value);
-                  handleSubmit(onSubmit)();
-                }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                {...register('database')}
-                label="Database"
-                fullWidth
-                onChange={(e) => {
-                  setValue('database', e.target.value);
-                  handleSubmit(onSubmit)();
-                }}
-              />
-            </Grid>
-          </>
-        )}
-      </Grid>
-    </Box>
+        );
+      }
+      
+      if (typeof defaultValue === 'object') {
+        return (
+          <TextField
+            key={field}
+            fullWidth
+            label={field}
+            value={JSON.stringify(taskData.config[field] || defaultValue)}
+            onChange={(e) => {
+              try {
+                handleConfigChange(field, JSON.parse(e.target.value));
+              } catch (error) {
+                // Handle invalid JSON
+              }
+            }}
+            margin="normal"
+            multiline
+            rows={4}
+            helperText={`Enter ${field} as JSON`}
+          />
+        );
+      }
+
+      return (
+        <TextField
+          key={field}
+          fullWidth
+          label={field}
+          value={taskData.config[field] || ''}
+          onChange={(e) => handleConfigChange(field, e.target.value)}
+          margin="normal"
+        />
+      );
+    });
+  };
+
+  return (
+    <Paper elevation={3} sx={{ p: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+        <Typography variant="h6">Task Configuration</Typography>
+        <IconButton onClick={onClose}>
+          <CloseIcon />
+        </IconButton>
+      </Box>
+
+      <TextField
+        fullWidth
+        label="Task Label"
+        value={taskData.label}
+        onChange={(e) => handleChange('label', e.target.value)}
+        margin="normal"
+      />
+
+      <FormControl fullWidth margin="normal">
+        <InputLabel>Task Type</InputLabel>
+        <Select
+          value={taskData.type}
+          label="Task Type"
+          onChange={(e) => handleChange('type', e.target.value)}
+        >
+          {Object.entries(taskTypes).map(([type, config]) => (
+            <MenuItem key={type} value={type}>
+              {config.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      {renderConfigFields()}
+
+      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button
+          variant="contained"
+          onClick={handleSubmit}
+          sx={{ mr: 1 }}
+        >
+          Update
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={onClose}
+        >
+          Cancel
+        </Button>
+      </Box>
+    </Paper>
   );
-}
+};
 
 export default TaskConfigForm; 

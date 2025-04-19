@@ -1,43 +1,43 @@
 from flask import Blueprint, request, jsonify
-from .services.dag_service import DAGService
+from .services.flow_service import FlowService
 from .services.task_service import TaskService
 from .services.execution_service import ExecutionService
 
-dag_bp = Blueprint('dag', __name__)
+flow_bp = Blueprint('flow', __name__)
 task_bp = Blueprint('task', __name__)
 execution_bp = Blueprint('execution', __name__)
 
-# DAG Routes
-@dag_bp.route('/', methods=['GET'])
-def get_dags():
-    dags = DAGService.get_all_dags()
-    return jsonify(dags)
+# Flow Routes
+@flow_bp.route('/', methods=['GET'])
+def get_flows():
+    flows = FlowService.get_all_flows()
+    return jsonify(flows)
 
-@dag_bp.route('/<dag_id>', methods=['GET'])
-def get_dag(dag_id):
-    dag = DAGService.get_dag(dag_id)
-    return jsonify(dag)
+@flow_bp.route('/<flow_id>', methods=['GET'])
+def get_flow(flow_id):
+    flow = FlowService.get_flow(flow_id)
+    return jsonify(flow)
 
-@dag_bp.route('/', methods=['POST'])
-def create_dag():
+@flow_bp.route('/', methods=['POST'])
+def create_flow():
     data = request.json
-    dag = DAGService.create_dag(data)
-    return jsonify(dag), 201
+    flow = FlowService.create_flow(data)
+    return jsonify(flow), 201
 
-@dag_bp.route('/<dag_id>', methods=['PUT'])
-def update_dag(dag_id):
+@flow_bp.route('/<flow_id>', methods=['PUT'])
+def update_flow(flow_id):
     data = request.json
-    dag = DAGService.update_dag(dag_id, data)
-    return jsonify(dag)
+    flow = FlowService.update_flow(flow_id, data)
+    return jsonify(flow)
 
-@dag_bp.route('/<dag_id>', methods=['DELETE'])
-def delete_dag(dag_id):
-    DAGService.delete_dag(dag_id)
+@flow_bp.route('/<flow_id>', methods=['DELETE'])
+def delete_flow(flow_id):
+    FlowService.delete_flow(flow_id)
     return '', 204
 
-@dag_bp.route('/<dag_id>/yaml', methods=['GET'])
-def get_dag_yaml(dag_id):
-    yaml_content = DAGService.get_dag_yaml(dag_id)
+@flow_bp.route('/<flow_id>/yaml', methods=['GET'])
+def get_flow_yaml(flow_id):
+    yaml_content = FlowService.get_flow_yaml(flow_id)
     return jsonify({'content': yaml_content})
 
 # Task Routes
@@ -58,9 +58,9 @@ def update_task(task_id):
     return jsonify(task)
 
 # Execution Routes
-@execution_bp.route('/<dag_id>', methods=['POST'])
-def trigger_execution(dag_id):
-    execution = ExecutionService.trigger_execution(dag_id)
+@execution_bp.route('/<flow_id>', methods=['POST'])
+def trigger_execution(flow_id):
+    execution = ExecutionService.trigger_execution(flow_id)
     return jsonify(execution), 201
 
 @execution_bp.route('/<execution_id>', methods=['GET'])

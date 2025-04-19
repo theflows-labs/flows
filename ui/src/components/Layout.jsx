@@ -32,8 +32,8 @@ function Layout({ children }) {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'DAGs', icon: <ListIcon />, path: '/dags' },
-    { text: 'New DAG', icon: <AddIcon />, path: '/dags/new' },
+    { text: 'Flows', icon: <ListIcon />, path: '/flows' },
+    { text: 'New Flow', icon: <AddIcon />, path: '/flows/new' },
   ];
 
   const drawer = (
