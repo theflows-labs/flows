@@ -21,7 +21,7 @@ os.environ['DB_PORT'] = '5433'
 os.environ['DB_NAME'] = 'postgress'
 
 # Import database constants
-from plugin_core.constants import SQLALCHEMY_CONN
+from config.database import SQLALCHEMY_CONN
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
