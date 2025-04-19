@@ -100,10 +100,9 @@ class TaskConfigurationRepository:
         self.engine = create_engine(SQLALCHEMY_CONN)
         self.Session = sessionmaker(bind=self.engine)
 
-    def create_task_config(self, flow_config_id: int, task_type: str, task_sequence: int, 
-                         config_details: Optional[Dict[str, Any]] = None,
-                         config_details_yaml: Optional[str] = None,
-                         description: Optional[str] = None) -> TaskConfiguration:
+    def create_task_config(self, flow_config_id: int, task_type: str, task_sequence: int,
+                          config_details: Dict[str, Any], config_details_yaml: Optional[str] = None,
+                          description: Optional[str] = None) -> TaskConfiguration:
         """Create a new task configuration."""
         session = self.Session()
         try:
@@ -187,9 +186,8 @@ class TaskDependencyRepository:
         self.engine = create_engine(SQLALCHEMY_CONN)
         self.Session = sessionmaker(bind=self.engine)
 
-    def create_dependency(self, flow_config_id: int, task_id: int, depends_on_task_id: int, 
-                         dependency_type: str = 'success',
-                         condition: Optional[str] = None) -> TaskDependency:
+    def create_dependency(self, flow_config_id: int, task_id: int, depends_on_task_id: int,
+                         dependency_type: str = 'success', condition: Optional[str] = None) -> TaskDependency:
         """Create a new task dependency."""
         session = self.Session()
         try:
@@ -248,17 +246,19 @@ class TaskDependencyRepository:
         finally:
             session.close()
 
-    def update_dependency(self, dependency_id: int, dependency_type: Optional[str] = None, 
-                         is_active: Optional[bool] = None) -> Optional[TaskDependency]:
+    def update_dependency(self, dependency_id: int, dependency_type: Optional[str] = None,
+                         condition: Optional[str] = None) -> Optional[TaskDependency]:
         """Update a task dependency."""
         session = self.Session()
         try:
-            dependency = session.query(TaskDependency).filter(TaskDependency.dependency_id == dependency_id).first()
+            dependency = session.query(TaskDependency).filter(
+                TaskDependency.dependency_id == dependency_id
+            ).first()
             if dependency:
                 if dependency_type is not None:
                     dependency.dependency_type = dependency_type
-                if is_active is not None:
-                    dependency.is_active = is_active
+                if condition is not None:
+                    dependency.condition = condition
                 session.commit()
                 session.refresh(dependency)
             return dependency

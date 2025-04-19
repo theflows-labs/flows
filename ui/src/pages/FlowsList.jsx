@@ -28,12 +28,13 @@ import {
   PlayArrow as RunIcon,
   History as HistoryIcon,
   FilterList as FilterIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 import useFlowStore from '../stores/flowStore';
 
 const FlowsList = () => {
   const navigate = useNavigate();
-  const { flows, fetchFlows, deleteFlow } = useFlowStore();
+  const { flows, fetchFlows, deleteFlow, downloadFlowYAML } = useFlowStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -216,6 +217,14 @@ const FlowsList = () => {
                     onClick={() => handleDeleteClick(flow)}
                   >
                     <DeleteIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Download YAML">
+                  <IconButton 
+                    size="small"
+                    onClick={() => downloadFlowYAML(flow.flow_id)}
+                  >
+                    <DownloadIcon />
                   </IconButton>
                 </Tooltip>
               </CardActions>

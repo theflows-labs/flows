@@ -51,11 +51,34 @@ def get_task(task_id):
     task = TaskService.get_task(task_id)
     return jsonify(task)
 
-@task_bp.route('/<task_id>', methods=['PUT'])
-def update_task(task_id):
+@task_bp.route('/', methods=['POST'])
+def create_task():
+    data = request.json
+    task = TaskService.create_task(data)
+    return jsonify(task), 201
+
+@task_bp.route('/<int:task_id>', methods=['PUT'])
+def update_task():
     data = request.json
     task = TaskService.update_task(task_id, data)
     return jsonify(task)
+
+@task_bp.route('/dependencies', methods=['POST'])
+def create_dependency():
+    data = request.json
+    dependency = TaskService.create_dependency(data)
+    return jsonify(dependency), 201
+
+@task_bp.route('/dependencies/<int:dependency_id>', methods=['PUT'])
+def update_dependency(dependency_id):
+    data = request.json
+    dependency = TaskService.update_dependency(dependency_id, data)
+    return jsonify(dependency)
+
+@task_bp.route('/flow/<int:flow_config_id>', methods=['GET'])
+def get_flow_tasks(flow_config_id):
+    tasks = TaskService.get_tasks_by_flow_config(flow_config_id)
+    return jsonify(tasks)
 
 # Execution Routes
 @execution_bp.route('/<flow_id>', methods=['POST'])

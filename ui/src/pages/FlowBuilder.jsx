@@ -144,10 +144,19 @@ const FlowBuilder = () => {
   };
 
   const handleSaveFlow = async () => {
+    // Add sequence numbers to nodes based on their position or connections
+    const nodesWithSequence = nodes.map((node, index) => ({
+      ...node,
+      data: {
+        ...node.data,
+        sequence: calculateNodeSequence(node, edges, index)
+      }
+    }));
+
     const flowData = {
       flow_id: newFlowData.flow_id || selectedFlow?.flow_id,
       config_details: {
-        nodes: nodes,
+        nodes: nodesWithSequence,
         edges: edges,
       },
       description: newFlowData.description || selectedFlow?.description,
@@ -165,6 +174,27 @@ const FlowBuilder = () => {
     } catch (error) {
       showNotification('Error saving flow', 'error');
     }
+  };
+
+  // Helper function to calculate node sequence
+  const calculateNodeSequence = (node, edges, defaultIndex) => {
+    // This is a simple implementation - you might want to make it more sophisticated
+    // based on your specific requirements
+    const incomingEdges = edges.filter(edge => edge.target === node.id);
+    if (incomingEdges.length === 0) {
+      return 1; // Start nodes
+    }
+    
+    // Get max sequence of source nodes and add 1
+    const sourceNodes = nodes.filter(n => 
+      incomingEdges.some(edge => edge.source === n.id)
+    );
+    const maxSourceSequence = Math.max(
+      ...sourceNodes.map(n => n.data.sequence || 0),
+      0
+    );
+    
+    return maxSourceSequence + 1;
   };
 
   const handleRunFlow = async () => {
