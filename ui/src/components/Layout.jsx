@@ -18,6 +18,7 @@ import {
   Dashboard as DashboardIcon,
   List as ListIcon,
   Add as AddIcon,
+  Extension as ExtensionIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -34,6 +35,7 @@ function Layout({ children }) {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Flows', icon: <ListIcon />, path: '/flows' },
     { text: 'New Flow', icon: <AddIcon />, path: '/flows/new' },
+    { text: 'Task Types', icon: <ExtensionIcon />, path: '/task-types' },
   ];
 
   const drawer = (

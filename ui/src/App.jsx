@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import FlowsList from './pages/FlowsList';
 import FlowBuilder from './pages/FlowBuilder';
+import TaskTypeManagement from './pages/TaskTypeManagement';
 
 // Create a theme instance
 const theme = createTheme({
@@ -30,6 +31,7 @@ function App() {
             <Route path="/flows" element={<FlowsList />} />
             <Route path="/flows/new" element={<FlowBuilder />} />
             <Route path="/flows/:flowId" element={<FlowBuilder />} />
+            <Route path="/task-types" element={<TaskTypeManagement />} />
           </Routes>
         </Layout>
       </Router>

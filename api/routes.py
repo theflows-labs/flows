@@ -107,19 +107,53 @@ def get_execution_logs(execution_id):
 @task_type_bp.route('/', methods=['GET'])
 def get_task_types():
     """Get all task types."""
-    task_types = TaskTypeService().get_task_types()
-    return jsonify(task_types)
+    try:
+        task_types = TaskTypeService().get_task_types()
+        return jsonify(task_types)
+    except Exception as e:
+        logger.error(f"Error getting task types: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @task_type_bp.route('/refresh', methods=['POST'])
 def refresh_task_types():
-    """Scan plugins and refresh task types."""
-    logger.info("Received request to refresh task types")
+    """Refresh task types by scanning plugins."""
     try:
         task_types = TaskTypeService().refresh_task_types()
-        logger.info(f"Successfully refreshed {len(task_types)} task types")
         return jsonify(task_types)
     except Exception as e:
         logger.error(f"Error refreshing task types: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@task_type_bp.route('/', methods=['POST'])
+def create_task_type():
+    """Create a new task type."""
+    try:
+        data = request.json
+        task_type = TaskTypeService().create_task_type(data)
+        return jsonify(task_type), 201
+    except Exception as e:
+        logger.error(f"Error creating task type: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@task_type_bp.route('/<type_key>', methods=['PUT'])
+def update_task_type(type_key):
+    """Update a task type."""
+    try:
+        data = request.json
+        task_type = TaskTypeService().update_task_type(type_key, data)
+        return jsonify(task_type)
+    except Exception as e:
+        logger.error(f"Error updating task type: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@task_type_bp.route('/<type_key>', methods=['DELETE'])
+def deactivate_task_type(type_key):
+    """Deactivate a task type."""
+    try:
+        TaskTypeService().deactivate_task_type(type_key)
+        return '', 204
+    except Exception as e:
+        logger.error(f"Error deactivating task type: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # Export all blueprints
