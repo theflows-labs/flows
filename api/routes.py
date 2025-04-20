@@ -43,8 +43,16 @@ def delete_flow(flow_id):
 
 @flow_bp.route('/<flow_id>/yaml', methods=['GET'])
 def get_flow_yaml(flow_id):
+    """Get the YAML representation of a flow."""
     yaml_content = FlowService.get_flow_yaml(flow_id)
-    return jsonify({'content': yaml_content})
+    if yaml_content is None:
+        return jsonify({'error': 'Flow not found'}), 404
+    
+    # Return YAML content directly with proper content type
+    return yaml_content, 200, {
+        'Content-Type': 'application/x-yaml',
+        'Content-Disposition': f'attachment; filename=flow-{flow_id}.yaml'
+    }
 
 # Task Routes
 @task_bp.route('/types', methods=['GET'])

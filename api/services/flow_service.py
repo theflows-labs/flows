@@ -77,9 +77,57 @@ class FlowService:
         """Get the YAML representation of a flow."""
         service = cls()
         flow = service.flow_repo.get_flow_config_by_flow_id(flow_id)
-        if flow:
-            return flow.config_details_yaml
-        return None
+        if not flow:
+            return None
+
+        # Get tasks with dependencies eagerly loaded
+        tasks = service.task_repo.get_task_configs_by_flow_config_with_dependencies(flow.config_id)
+        
+        # Build task dependencies
+        task_dependencies = []
+        for task in tasks:
+            # Dependencies are now eagerly loaded
+            for dep in task.dependencies:
+                task_dependencies.append({
+                    'from': dep.task_id,
+                    'to': dep.depends_on_task_id,
+                    'type': dep.dependency_type,
+                    'condition': dep.condition
+                })
+
+        # Build YAML structure
+        yaml_structure = {
+            'version': '1.0',
+            'flow': {
+                'id': flow.flow_id,
+                'description': flow.description or '',
+                'tasks': [{
+                    'id': task.task_id,
+                    'type': task.task_type,
+                    'name': task.description or f'Task {task.task_sequence}',
+                    'description': task.description or '',
+                    'config': task.config_details or {},
+                    'sequence': task.task_sequence
+                } for task in tasks],
+                'dependencies': task_dependencies
+            },
+            'metadata': {
+                'created_at': flow.created_dt.isoformat() if flow.created_dt else None,
+                'updated_at': flow.updated_dt.isoformat() if flow.updated_dt else None,
+                'version': '1.0',
+                'engine': 'airflow'
+            }
+        }
+
+        # Convert to YAML with proper formatting
+        return yaml.dump(
+            yaml_structure,
+            default_flow_style=False,
+            sort_keys=False,
+            indent=2,
+            width=120,
+            allow_unicode=True
+        )
 
     @staticmethod
     def _flow_to_dict(flow: FlowConfiguration) -> Dict[str, Any]:

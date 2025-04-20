@@ -174,10 +174,12 @@ const useFlowStore = create((set) => ({
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      // Get the YAML content directly
       const yamlContent = await response.text();
       
       // Create and trigger download
-      const blob = new Blob([yamlContent], { type: 'text/yaml' });
+      const blob = new Blob([yamlContent], { type: 'application/x-yaml' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -271,23 +273,43 @@ async function saveDependencies(flowConfigId, edges, taskIdMapping) {
 // Helper function to generate YAML
 function generateFlowYAML(flowData) {
   const yamlStructure = {
-    flow_id: flowData.flow_id,
-    description: flowData.description,
-    tasks: flowData.config_details.nodes.map(node => ({
-      id: node.id,
-      type: node.data.type,
-      label: node.data.label,
-      config: node.data.config,
-      sequence: node.data.sequence || 0
-    })),
-    dependencies: flowData.config_details.edges.map(edge => ({
-      source_task_id: edge.source,
-      target_task_id: edge.target,
-      type: edge.data?.type || 'success'
-    }))
+    version: '1.0',
+    flow: {
+      id: flowData.flow_id,
+      description: flowData.description || '',
+      tasks: flowData.config_details.nodes.map(node => ({
+        id: node.id,
+        type: node.data.type,
+        name: node.data.label,
+        description: node.data.description || '',
+        config: node.data.config || {},
+        sequence: node.data.sequence || 0
+      })),
+      dependencies: flowData.config_details.edges.map(edge => ({
+        from: edge.source,
+        to: edge.target,
+        type: edge.data?.type || 'success',
+        condition: edge.data?.condition || null
+      }))
+    },
+    metadata: {
+      created_at: new Date().toISOString(),
+      version: '1.0',
+      engine: 'airflow'
+    }
   };
 
-  return yaml.dump(yamlStructure);
+  // Use js-yaml with proper options for formatting
+  return yaml.dump(yamlStructure, {
+    indent: 2,
+    lineWidth: -1, // Disable line wrapping
+    noRefs: true,
+    sortKeys: false,
+    noCompatMode: true,
+    quotingType: '"',
+    forceQuotes: false,
+    flowLevel: -1
+  });
 }
 
 export default useFlowStore; 

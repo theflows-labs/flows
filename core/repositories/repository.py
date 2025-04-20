@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 from enum import Enum
 from sqlalchemy import and_
+from sqlalchemy.orm import joinedload
 
 from config.database import SQLALCHEMY_CONN
 
@@ -146,6 +147,30 @@ class TaskConfigurationRepository:
             ).order_by(TaskConfiguration.task_sequence).all()
         finally:
             session.close()
+
+    def get_task_configs_by_flow_config_with_dependencies(self, flow_config_id: int) -> List[TaskConfiguration]:
+        """
+        Get all task configurations for a flow config with dependencies eagerly loaded.
+        
+        Args:
+            flow_config_id: The flow configuration ID
+            
+        Returns:
+            List of TaskConfiguration objects with dependencies
+        """
+        with self.Session() as session:
+            tasks = session.query(TaskConfiguration)\
+                .options(joinedload(TaskConfiguration.dependencies))\
+                .filter(
+                    TaskConfiguration.flow_config_id == flow_config_id,
+                    TaskConfiguration.is_active == True
+                )\
+                .order_by(TaskConfiguration.task_sequence)\
+                .all()
+            
+            # Detach the objects from the session but keep the loaded relationships
+            session.expunge_all()
+            return tasks
 
     def update_task_config(self, task_id: int, config_details: Optional[Dict[str, Any]] = None, 
                          description: Optional[str] = None, is_active: Optional[bool] = None) -> Optional[TaskConfiguration]:
