@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
-from api.routes import flow_bp, task_bp, execution_bp
+from api.routes import flow_bp, task_bp, execution_bp, task_type_bp
 from config.database import (
     SQLALCHEMY_CONN,
     SQLALCHEMY_TRACK_MODIFICATIONS,
@@ -23,6 +23,7 @@ def create_app():
     app.register_blueprint(flow_bp, url_prefix='/api/flows')
     app.register_blueprint(task_bp, url_prefix='/api/tasks')
     app.register_blueprint(execution_bp, url_prefix='/api/executions')
+    app.register_blueprint(task_type_bp, url_prefix='/api/task-types')
 
     # Error handlers
     @app.errorhandler(404)

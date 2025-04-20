@@ -1,108 +1,15 @@
 from typing import Dict, List, Optional, Any
 from core.repositories.repository import TaskConfigurationRepository, TaskDependencyRepository
 from core.models.models import TaskConfiguration, TaskDependency
+from .task_type_service import TaskTypeService
 import yaml
 
 
 class TaskService:
-    # Define available task types and their configurations
-    TASK_TYPES = {
-        'python': {
-            'name': 'Python Task',
-            'description': 'Execute a Python function',
-            'config_schema': {
-                'type': 'object',
-                'properties': {
-                    'python_callable': {
-                        'type': 'string',
-                        'description': 'Python function to execute'
-                    },
-                    'op_args': {
-                        'type': 'array',
-                        'description': 'Positional arguments to pass to the function'
-                    },
-                    'op_kwargs': {
-                        'type': 'object',
-                        'description': 'Keyword arguments to pass to the function'
-                    }
-                },
-                'required': ['python_callable']
-            }
-        },
-        'bash': {
-            'name': 'Bash Task',
-            'description': 'Execute a bash command',
-            'config_schema': {
-                'type': 'object',
-                'properties': {
-                    'bash_command': {
-                        'type': 'string',
-                        'description': 'Bash command to execute'
-                    }
-                },
-                'required': ['bash_command']
-            }
-        },
-        'sql': {
-            'name': 'SQL Task',
-            'description': 'Execute a SQL query',
-            'config_schema': {
-                'type': 'object',
-                'properties': {
-                    'sql': {
-                        'type': 'string',
-                        'description': 'SQL query to execute'
-                    },
-                    'conn_id': {
-                        'type': 'string',
-                        'description': 'Connection ID to use'
-                    }
-                },
-                'required': ['sql', 'conn_id']
-            }
-        },
-        'http': {
-            'name': 'HTTP Task',
-            'description': 'Make an HTTP request',
-            'config_schema': {
-                'type': 'object',
-                'properties': {
-                    'url': {
-                        'type': 'string',
-                        'description': 'URL to make request to'
-                    },
-                    'method': {
-                        'type': 'string',
-                        'enum': ['GET', 'POST', 'PUT', 'DELETE'],
-                        'description': 'HTTP method'
-                    }
-                },
-                'required': ['url', 'method']
-            }
-        },
-        'docker': {
-            'name': 'Docker Task',
-            'description': 'Run a Docker container',
-            'config_schema': {
-                'type': 'object',
-                'properties': {
-                    'image': {
-                        'type': 'string',
-                        'description': 'Docker image to run'
-                    },
-                    'command': {
-                        'type': 'string',
-                        'description': 'Command to run in container'
-                    }
-                },
-                'required': ['image']
-            }
-        }
-    }
-
     def __init__(self):
         self.task_repo = TaskConfigurationRepository()
         self.dependency_repo = TaskDependencyRepository()
+        self.task_type_service = TaskTypeService()
 
     @classmethod
     def get_task(cls, task_id: int) -> Optional[Dict[str, Any]]:
@@ -184,15 +91,8 @@ class TaskService:
     @classmethod
     def get_task_types(cls) -> List[Dict[str, Any]]:
         """Get available task types with their schemas."""
-        return [
-            {
-                'type': task_type,
-                'name': config['name'],
-                'description': config['description'],
-                'config_schema': config['config_schema']
-            }
-            for task_type, config in cls.TASK_TYPES.items()
-        ]
+        service = cls()
+        return service.task_type_service.get_task_types()
 
     @staticmethod
     def _validate_config(config: Dict[str, Any], schema: Dict[str, Any]) -> None:

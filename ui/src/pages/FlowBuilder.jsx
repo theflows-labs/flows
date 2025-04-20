@@ -37,52 +37,6 @@ const nodeTypes = {
   task: TaskNode,
 };
 
-const TASK_TYPES = {
-  python: {
-    name: 'Python Task',
-    description: 'Execute a Python function',
-    defaultConfig: {
-      python_callable: '',
-      op_args: [],
-      op_kwargs: {},
-    },
-  },
-  bash: {
-    name: 'Bash Task',
-    description: 'Execute a bash command',
-    defaultConfig: {
-      bash_command: '',
-    },
-  },
-  sql: {
-    name: 'SQL Task',
-    description: 'Execute a SQL query',
-    defaultConfig: {
-      sql: '',
-      conn_id: '',
-    },
-  },
-  http: {
-    name: 'HTTP Task',
-    description: 'Make an HTTP request',
-    defaultConfig: {
-      url: '',
-      method: 'GET',
-      headers: {},
-      data: {},
-    },
-  },
-  docker: {
-    name: 'Docker Task',
-    description: 'Run a Docker container',
-    defaultConfig: {
-      image: '',
-      command: '',
-      environment: {},
-    },
-  },
-};
-
 const FlowBuilder = () => {
   const { flowId } = useParams();
   const navigate = useNavigate();
@@ -94,6 +48,7 @@ const FlowBuilder = () => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
   const { saveFlow, updateFlow, selectedFlow, setSelectedFlow } = useFlowStore();
+  const [taskTypes, setTaskTypes] = useState({});
 
   useEffect(() => {
     if (flowId) {
@@ -113,7 +68,35 @@ const FlowBuilder = () => {
       };
       loadFlow();
     }
-  }, [flowId]);
+
+    // Fetch task types when component mounts
+    const fetchTaskTypes = async () => {
+      try {
+        const response = await fetch('/api/tasks/types');
+        if (!response.ok) throw new Error('Failed to fetch task types');
+        const types = await response.json();
+        
+        // Convert array to object format
+        const typeMap = types.reduce((acc, type) => ({
+          ...acc,
+          [type.type_key]: {
+            name: type.name,
+            description: type.description,
+            configSchema: type.config_schema,
+            defaultConfig: type.default_config,
+            icon: type.icon
+          }
+        }), {});
+        
+        setTaskTypes(typeMap);
+      } catch (error) {
+        console.error('Error fetching task types:', error);
+        // Handle error (show notification, etc.)
+      }
+    };
+
+    fetchTaskTypes();
+  }, []);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -128,15 +111,16 @@ const FlowBuilder = () => {
     setAnchorEl(event.currentTarget);
   };
 
-  const handleTaskTypeSelect = (taskType) => {
+  const handleTaskTypeSelect = (typeKey) => {
+    const taskType = taskTypes[typeKey];
     const newNode = {
       id: `task-${Date.now()}`,
       type: 'task',
       position: { x: 100, y: 100 },
       data: {
-        label: `New ${taskType} Task`,
-        type: taskType,
-        config: TASK_TYPES[taskType].defaultConfig,
+        label: `New ${taskType.name}`,
+        type: typeKey,
+        config: taskType.defaultConfig || {},
       },
     };
     setNodes((nds) => [...nds, newNode]);
@@ -274,7 +258,7 @@ const FlowBuilder = () => {
           <Box sx={{ width: 300, p: 2, borderLeft: 1, borderColor: 'divider' }}>
             <TaskConfigForm
               node={selectedNode}
-              taskTypes={TASK_TYPES}
+              taskTypes={taskTypes}
               onUpdate={(updatedNode) => {
                 setNodes((nds) =>
                   nds.map((node) =>
@@ -293,15 +277,15 @@ const FlowBuilder = () => {
         open={Boolean(anchorEl)}
         onClose={() => setAnchorEl(null)}
       >
-        {Object.entries(TASK_TYPES).map(([type, config]) => (
+        {Object.entries(taskTypes).map(([typeKey, taskType]) => (
           <MenuItem
-            key={type}
-            onClick={() => handleTaskTypeSelect(type)}
+            key={typeKey}
+            onClick={() => handleTaskTypeSelect(typeKey)}
           >
             <Typography variant="body2">
-              {config.name}
+              {taskType.name}
               <Typography variant="caption" display="block" color="text.secondary">
-                {config.description}
+                {taskType.description}
               </Typography>
             </Typography>
           </MenuItem>

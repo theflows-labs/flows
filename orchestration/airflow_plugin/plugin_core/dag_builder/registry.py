@@ -1,7 +1,7 @@
 """
 Registry for operator factories.
 """
-from typing import Dict, Type, Optional
+from typing import Dict, Type, Optional, List, Any
 import logging
 import importlib
 import pkgutil
@@ -30,6 +30,7 @@ class OperatorRegistry:
             
         self._factories: Dict[str, Type[OperatorFactory]] = {}
         self._initialized = True
+        logger.info("Initialized new OperatorRegistry instance")
     
     @classmethod
     def register_factories(cls):
@@ -52,95 +53,129 @@ class OperatorRegistry:
         registry.discover_factories_from_directory(plugins_dir)
         
         # If no factories were discovered, manually register the known factories
-        if not registry._factories:
-            logger.info("No factories discovered automatically. Manually registering known factories.")
+        # if not registry._factories:
+        #     logger.info("No factories discovered automatically. Manually registering known factories.")
             
-            # Manually import and register the known operator factories
-            try:
-                # Import S3 operator factories
-                from plugins.aws.s3.operators.s3_operations import (
-                    S3CopyObjectOperatorFactory,
-                    S3PutObjectOperatorFactory,
-                    S3ListOperatorFactory,
-                    S3DeleteObjectsOperatorFactory
-                )
+        #     # Manually import and register the known operator factories
+        #     try:
+        #         # Import S3 operator factories
+        #         from plugins.aws.s3.operators.s3_operations import (
+        #             S3CopyObjectOperatorFactory,
+        #             S3PutObjectOperatorFactory,
+        #             S3ListOperatorFactory,
+        #             S3DeleteObjectsOperatorFactory
+        #         )
                 
-                # Import Athena operator factories
-                from plugins.aws.athena.operators.athena_query import (
-                    AthenaQueryOperatorFactory
-                )
+        #         # Import Athena operator factories
+        #         from plugins.aws.athena.operators.athena_query import (
+        #             AthenaQueryOperatorFactory
+        #         )
                 
-                # Register the factories
-                registry.register(S3CopyObjectOperatorFactory.TASK_TYPE, S3CopyObjectOperatorFactory)
-                registry.register(S3PutObjectOperatorFactory.TASK_TYPE, S3PutObjectOperatorFactory)
-                registry.register(S3ListOperatorFactory.TASK_TYPE, S3ListOperatorFactory)
-                registry.register(S3DeleteObjectsOperatorFactory.TASK_TYPE, S3DeleteObjectsOperatorFactory)
-                registry.register(AthenaQueryOperatorFactory.TASK_TYPE, AthenaQueryOperatorFactory)
+        #         # Register the factories
+        #         registry.register(S3CopyObjectOperatorFactory.TASK_TYPE, S3CopyObjectOperatorFactory)
+        #         registry.register(S3PutObjectOperatorFactory.TASK_TYPE, S3PutObjectOperatorFactory)
+        #         registry.register(S3ListOperatorFactory.TASK_TYPE, S3ListOperatorFactory)
+        #         registry.register(S3DeleteObjectsOperatorFactory.TASK_TYPE, S3DeleteObjectsOperatorFactory)
+        #         registry.register(AthenaQueryOperatorFactory.TASK_TYPE, AthenaQueryOperatorFactory)
                 
-                logger.info("Successfully registered operator factories manually.")
-            except ImportError as e:
-                logger.error(f"Error importing operator factories: {str(e)}")
+        #         logger.info("Successfully registered operator factories manually.")
+        #     except ImportError as e:
+        #         logger.error(f"Error importing operator factories: {str(e)}")
         
         # Log the discovered factories
         logger.info(f"Discovered {len(registry._factories)} operator factories: {list(registry._factories.keys())}")
         
         return registry
     
-    def discover_factories_from_directory(self, directory: str) -> None:
+    def discover_factories_from_directory(self, directory: str) -> List[Dict[str, Any]]:
         """
-        Discover operator factories in a directory.
-        
-        Args:
-            directory: The directory to search
+        Discover operator factories and return task type information.
         """
+        task_types = []
+        logger.info(f"Starting factory discovery in directory: {directory}")
+
         try:
+            # Add the parent directory to Python path for proper imports
+            parent_dir = os.path.dirname(directory)
+            if parent_dir not in sys.path:
+                sys.path.insert(0, parent_dir)
+                logger.info(f"Added to Python path: {parent_dir}")
+
             # Walk through the directory
             for root, dirs, files in os.walk(directory):
-                # Skip __pycache__ directories
                 if '__pycache__' in root:
                     continue
-                
-                # Get the relative path from the plugins directory
-                rel_path = os.path.relpath(root, os.path.dirname(directory))
+
+                logger.info(f"Scanning directory: {root}")
+                logger.info(f"Found directories: {dirs}")
+                logger.info(f"Found files: {files}")
+
+                # Get the module path relative to the plugins directory
+                rel_path = os.path.relpath(root, parent_dir)
                 package_name = rel_path.replace(os.sep, '.')
                 
-                # Check for Python files in the current directory
+                logger.info(f"Processing package: {package_name}")
+
+                # Process Python files
                 for file in files:
                     if file.endswith('.py') and not file.startswith('__'):
-                        # Get the module name (without .py extension)
                         module_name = file[:-3]
-                        full_module_name = f"{package_name}.{module_name}" if package_name else module_name
+                        full_module_name = f"{package_name}.{module_name}"
+                        
+                        logger.info(f"Attempting to import module: {full_module_name}")
                         
                         try:
-                            # Import the module
                             module = importlib.import_module(full_module_name)
+                            logger.info(f"Successfully imported module: {full_module_name}")
                             
-                            # Look for operator factories in the module
-                            for _, obj in inspect.getmembers(module):
-                                if (inspect.isclass(obj) and 
-                                    issubclass(obj, OperatorFactory) and 
-                                    obj != OperatorFactory):
-                                    
-                                    # Get task type from class
-                                    task_type = getattr(obj, 'TASK_TYPE', None)
-                                    if task_type:
-                                        self.register(task_type, obj)
-                                        logger.info(f"Discovered operator factory {obj.__name__} with task type {task_type}")
-                                    else:
-                                        logger.warning(f"Operator factory {obj.__name__} has no TASK_TYPE attribute")
+                            # Look for operator factory classes
+                            for name, obj in inspect.getmembers(module):
+                                logger.debug(f"Inspecting member: {name}")
+                                
+                                try:
+                                    if (inspect.isclass(obj) and 
+                                        issubclass(obj, OperatorFactory) and 
+                                        obj != OperatorFactory):
+                                        
+                                        logger.info(f"Found operator factory class: {name}")
+                                        
+                                        task_type = getattr(obj, 'TASK_TYPE', None)
+                                        if task_type:
+                                            logger.info(f"Found task type: {task_type}")
+                                            
+                                            # Create an instance to get task type info
+                                            factory = obj()
+                                            task_type_info = {
+                                                'type_key': task_type,
+                                                'name': obj.__name__,
+                                                'description': obj.__doc__ or '',
+                                                'plugin_source': full_module_name,
+                                                'config_schema': factory.get_config_schema(),
+                                                'default_config': factory.get_default_config(),
+                                                'icon': factory.get_icon() if hasattr(factory, 'get_icon') else 'airflow'
+                                            }
+                                            
+                                            # Register the factory and collect task type info
+                                            self.register(task_type, obj)
+                                            task_types.append(task_type_info)
+                                            
+                                            logger.info(f"Successfully registered task type: {task_type}")
+                                        else:
+                                            logger.warning(f"Class {name} has no TASK_TYPE attribute")
+                                except Exception as e:
+                                    logger.error(f"Error processing class {name}: {str(e)}")
+                        
                         except ImportError as e:
-                            logger.warning(f"Could not import module {full_module_name}: {str(e)}")
+                            logger.error(f"ImportError for module {full_module_name}: {str(e)}")
+                            logger.error(f"Current sys.path: {sys.path}")
                         except Exception as e:
                             logger.error(f"Error processing module {full_module_name}: {str(e)}")
-                
-                # Also check if this is a Python package for nested packages
-                if '__init__.py' in files:
-                    try:
-                        self.discover_factories(package_name)
-                    except ImportError as e:
-                        logger.warning(f"Could not import package {package_name}: {str(e)}")
+        
         except Exception as e:
-            logger.error(f"Error discovering operator factories in directory {directory}: {str(e)}")
+            logger.error(f"Error during factory discovery: {str(e)}", exc_info=True)
+        
+        logger.info(f"Discovery complete. Found {len(task_types)} task types")
+        return task_types
     
     def register(self, task_type: str, factory_class: Type[OperatorFactory]) -> None:
         """

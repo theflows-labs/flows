@@ -1,48 +1,45 @@
 """
 YAML-based DAG builder implementation.
 """
-from typing import Dict, Optional
+import yaml
+from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 from airflow import DAG
 from airflow.models import BaseOperator
 
-from orchestration.airflow_plugin.plugin_core.dag_builder.base import DAGBuilder, OperatorFactory
+from orchestration.airflow_plugin.plugin_core.dag_builder.base import ConfigBasedDAGBuilder
 from orchestration.airflow_plugin.plugin_core.dag_builder.yaml_loader import YAMLConfigurationLoader
 from orchestration.airflow_plugin.plugin_core.dag_builder.registry import OperatorRegistry
 
-class YAMLDAGBuilder(DAGBuilder):
-    """Builder for creating Airflow DAGs from YAML configuration."""
+class YAMLDAGBuilder(ConfigBasedDAGBuilder):
+    """Builder for creating DAGs from YAML configuration files."""
     
-    def __init__(self, config_path: str, dag_id: str):
-        """
-        Initialize the YAML DAG builder.
-        
-        Args:
-            config_path: Path to the YAML configuration file
-            dag_id: The ID of the DAG to build
-        """
-        self.config_path = Path(config_path)
-        self.dag_id = dag_id
-        self.loader = YAMLConfigurationLoader(config_path)
-        
-        # Initialize the base DAGBuilder with a dummy ID since we're using YAML
-        super().__init__(dag_id)
-        
-        # Register operator factories
-        self._register_operator_factories()
-        
-    def _register_operator_factories(self) -> None:
-        """Register operator factories with the builder."""
-        # Get the operator registry
-        registry = OperatorRegistry.register_factories()
-        
-        # Register all discovered factories
-        for task_type in registry.get_all_task_types():
-            factory = registry.create_factory(task_type)
-            if factory:
-                self.register_operator_factory(task_type, factory)
-        
+    def __init__(self, yaml_path: str):
+        super().__init__()
+        self.yaml_path = Path(yaml_path)
+        self._load_yaml()
+    
+    def _load_yaml(self) -> None:
+        """Load YAML configuration."""
+        if not self.yaml_path.exists():
+            raise FileNotFoundError(f"YAML file not found: {self.yaml_path}")
+            
+        with open(self.yaml_path) as f:
+            self.config = yaml.safe_load(f)
+    
+    def _get_dag_config(self) -> Optional[Dict[str, Any]]:
+        """Get DAG configuration from YAML."""
+        return self.config.get('dag')
+    
+    def _get_task_configs(self) -> Dict[str, Dict[str, Any]]:
+        """Get task configurations from YAML."""
+        return self.config.get('tasks', {})
+    
+    def _get_dependencies(self) -> List[Dict[str, Any]]:
+        """Get task dependencies from YAML."""
+        return self.config.get('dependencies', [])
+    
     def build(self) -> Optional[DAG]:
         """
         Build an Airflow DAG from YAML configuration.
@@ -51,60 +48,64 @@ class YAMLDAGBuilder(DAGBuilder):
             An Airflow DAG instance or None if configuration not found
         """
         # Get DAG configuration
-        dag_config = self.loader.get_dag_config(self.dag_id)
+        dag_config = self._get_dag_config()
         if not dag_config:
             return None
             
         # Create DAG
-        dag = self._create_dag(dag_config, dag_config.config_details)
+        dag = self._create_dag(dag_config)
         
         # Get tasks
-        tasks = self.loader.get_task_configs_by_dag_config(self.dag_id)
+        task_configs = self._get_task_configs()
         
         # Create task operators
         task_operators = {}
-        for task in tasks:
-            if not task.is_active:
-                continue
-                
-            operator = self._create_task_operator(task, dag)
+        for task_id, task_config in task_configs.items():
+            operator = self._create_task_operator(
+                task_type=task_config['task_type'],
+                task_id=task_id,
+                config=task_config['config'],
+                dag=dag
+            )
             if operator:
-                task_operators[task.task_id] = operator
+                task_operators[task_id] = operator
         
         # Set up dependencies
-        self._setup_dependencies(task_operators)
+        dependencies = self._get_dependencies()
+        self._setup_dependencies(task_operators, dependencies)
         
         return dag
         
-    def _setup_dependencies(self, task_operators: Dict[str, BaseOperator]) -> None:
+    def _setup_dependencies(self, operators: Dict[str, BaseOperator], dependencies: List[Dict[str, Any]]) -> None:
         """
         Set up task dependencies from YAML configuration.
         
         Args:
-            task_operators: Dictionary mapping task IDs to operators
+            operators: Dictionary mapping task IDs to operators
+            dependencies: List of task dependencies
         """
-        # Get dependencies
-        dependencies = self.loader.get_dependencies_by_dag(self.dag_id)
-        
-        # Set up dependencies
         for dep in dependencies:
-            if not dep.is_active:
-                continue
-                
-            # Get operators
-            task_operator = task_operators.get(dep.task_id)
-            depends_on_operator = task_operators.get(dep.depends_on_task_id)
+            upstream_id = dep['upstream_task_id']
+            downstream_id = dep['downstream_task_id']
             
-            if task_operator and depends_on_operator:
-                # Set up dependency based on type
-                if dep.dependency_type == 'success':
-                    task_operator.set_upstream(depends_on_operator)
-                elif dep.dependency_type == 'failure':
-                    task_operator.set_upstream(depends_on_operator, trigger_rule='all_failed')
-                elif dep.dependency_type == 'skip':
-                    task_operator.set_upstream(depends_on_operator, trigger_rule='all_done')
-                elif dep.dependency_type == 'all_done':
-                    task_operator.set_upstream(depends_on_operator, trigger_rule='all_done')
-                else:
-                    # Default to success
-                    task_operator.set_upstream(depends_on_operator) 
+            if upstream_id in operators and downstream_id in operators:
+                operators[upstream_id] >> operators[downstream_id]
+        
+    def _create_dag(self, config: Dict[str, Any]) -> DAG:
+        """Create DAG instance from configuration."""
+        return DAG(
+            dag_id=config['dag_id'],
+            description=config.get('description', ''),
+            schedule_interval=config.get('schedule_interval'),
+            default_args=config.get('default_args', {}),
+            catchup=config.get('catchup', False),
+            tags=config.get('tags', []),
+            max_active_runs=config.get('max_active_runs', 1)
+        )
+        
+    def _create_task_operator(self, task_type: str, task_id: str, config: Dict[str, Any], dag: DAG) -> Optional[BaseOperator]:
+        """Create an operator instance."""
+        factory = self.operator_factories.get(task_type)
+        if not factory:
+            return None
+        return factory.create_operator(task_id, config, dag) 

@@ -1,0 +1,35 @@
+dag:
+  dag_id: example_dag
+  description: Example DAG from YAML
+  schedule_interval: '@daily'
+  default_args:
+    owner: airflow
+    start_date: 2024-03-24
+  catchup: false
+  tags:
+    - example
+    - yaml
+  max_active_runs: 1
+
+tasks:
+  task1:
+    task_type: python
+    config:
+      python_callable: my_function
+      op_args:
+        - arg1
+        - arg2
+      op_kwargs:
+        key1: value1
+        key2: value2
+
+  task2:
+    task_type: bash
+    config:
+      bash_command: echo "Hello World"
+      env:
+        MY_VAR: my_value
+
+dependencies:
+  - upstream_task_id: task1
+    downstream_task_id: task2 

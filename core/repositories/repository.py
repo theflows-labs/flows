@@ -1,12 +1,13 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from core.models import FlowConfiguration, TaskConfiguration, TaskDependency, FlowExecution, TaskExecution
+from core.models import FlowConfiguration, TaskConfiguration, TaskDependency, FlowExecution, TaskExecution, TaskType
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 import json
 from datetime import datetime
 from enum import Enum
+from sqlalchemy import and_
 
 from config.database import SQLALCHEMY_CONN
 
@@ -394,4 +395,151 @@ class TaskExecutionRepository:
                 session.refresh(task_execution)
             return task_execution
         finally:
-            session.close() 
+            session.close()
+
+class TaskTypeRepository:
+    """Repository for managing task types."""
+
+    def __init__(self):
+        # Initialize database connection
+        self.engine = create_engine(SQLALCHEMY_CONN)
+        self.Session = sessionmaker(bind=self.engine)
+
+    def upsert_task_type(self, **task_type_data) -> Dict[str, Any]:
+        """
+        Create or update a task type.
+        
+        Args:
+            **task_type_data: Task type data including type_key, name, description, etc.
+            
+        Returns:
+            Dict containing the task type data
+        """
+        with self.Session() as session:
+            # Check if task type exists
+            task_type = session.query(TaskType).filter(
+                TaskType.type_key == task_type_data['type_key']
+            ).first()
+            
+            if task_type:
+                # Update existing task type
+                for key, value in task_type_data.items():
+                    setattr(task_type, key, value)
+                task_type.updated_dt = datetime.utcnow()
+            else:
+                # Create new task type
+                task_type = TaskType(**task_type_data)
+                session.add(task_type)
+            
+            session.commit()
+            return self._to_dict(task_type)
+
+    def get_all_active_task_types(self) -> List[Dict[str, Any]]:
+        """
+        Get all active task types.
+        
+        Returns:
+            List of task type dictionaries
+        """
+        with self.Session() as session:
+            task_types = session.query(TaskType).filter(
+                TaskType.is_active == True
+            ).all()
+            return [self._to_dict(tt) for tt in task_types]
+
+    def get_task_type_by_key(self, type_key: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a task type by its key.
+        
+        Args:
+            type_key: The unique key of the task type
+            
+        Returns:
+            Task type dictionary or None if not found
+        """
+        with self.Session() as session:
+            task_type = session.query(TaskType).filter(
+                and_(
+                    TaskType.type_key == type_key,
+                    TaskType.is_active == True
+                )
+            ).first()
+            return self._to_dict(task_type) if task_type else None
+
+    def deactivate_task_type(self, type_key: str) -> bool:
+        """
+        Deactivate a task type.
+        
+        Args:
+            type_key: The unique key of the task type
+            
+        Returns:
+            True if successful, False if task type not found
+        """
+        with self.Session() as session:
+            task_type = session.query(TaskType).filter(
+                TaskType.type_key == type_key
+            ).first()
+            
+            if task_type:
+                task_type.is_active = False
+                task_type.updated_dt = datetime.utcnow()
+                session.commit()
+                return True
+            return False
+
+    def _to_dict(self, task_type: TaskType) -> Dict[str, Any]:
+        """
+        Convert a TaskType model instance to a dictionary.
+        
+        Args:
+            task_type: TaskType model instance
+            
+        Returns:
+            Dictionary representation of the task type
+        """
+        return {
+            'type_id': task_type.type_id,
+            'type_key': task_type.type_key,
+            'name': task_type.name,
+            'description': task_type.description,
+            'plugin_source': task_type.plugin_source,
+            'config_schema': task_type.config_schema,
+            'default_config': task_type.default_config,
+            'icon': task_type.icon,
+            'is_active': task_type.is_active,
+            'created_dt': task_type.created_dt.isoformat() if task_type.created_dt else None,
+            'updated_dt': task_type.updated_dt.isoformat() if task_type.updated_dt else None
+        }
+
+    def bulk_upsert_task_types(self, task_types: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Create or update multiple task types in bulk.
+        
+        Args:
+            task_types: List of task type data dictionaries
+            
+        Returns:
+            List of updated task type dictionaries
+        """
+        updated_types = []
+        with self.Session() as session:
+            for task_type_data in task_types:
+                task_type = session.query(TaskType).filter(
+                    TaskType.type_key == task_type_data['type_key']
+                ).first()
+                
+                if task_type:
+                    # Update existing task type
+                    for key, value in task_type_data.items():
+                        setattr(task_type, key, value)
+                    task_type.updated_dt = datetime.utcnow()
+                else:
+                    # Create new task type
+                    task_type = TaskType(**task_type_data)
+                    session.add(task_type)
+                
+                updated_types.append(task_type)
+            
+            session.commit()
+            return [self._to_dict(tt) for tt in updated_types] 

@@ -7,7 +7,7 @@ from pathlib import Path
 import logging
 
 from core.models import (
-    DAGConfiguration,
+    FlowConfiguration,
     TaskConfiguration,
     TaskDependency
 )
@@ -36,7 +36,7 @@ class YAMLConfigurationLoader:
             logger.error(f"Error loading YAML configuration: {str(e)}")
             raise
             
-    def get_dag_config(self, dag_id: str) -> Optional[DAGConfiguration]:
+    def get_dag_config(self, dag_id: str) -> Optional[FlowConfiguration]:
         """
         Get DAG configuration by ID.
         
@@ -53,8 +53,8 @@ class YAMLConfigurationLoader:
         if not dag_config:
             return None
             
-        return DAGConfiguration(
-            dag_id=dag_id,
+        return FlowConfiguration(
+            flow_id=dag_id,
             description=dag_config.get('description', ''),
             config_details=dag_config.get('config', {}),
             is_active=dag_config.get('is_active', True)

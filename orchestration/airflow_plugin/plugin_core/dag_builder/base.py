@@ -11,8 +11,8 @@ from airflow import DAG
 from airflow.models import BaseOperator
 from airflow.utils.dates import days_ago
 
-from core.repositories import DAGConfigurationRepository, TaskConfigurationRepository, TaskDependencyRepository
-from core.models import DAGConfiguration, TaskConfiguration, TaskDependency
+from core.repositories import FlowConfigurationRepository, TaskConfigurationRepository, TaskDependencyRepository
+from core.models import FlowConfiguration, TaskConfiguration, TaskDependency
 
 logger = logging.getLogger(__name__)
 
@@ -214,187 +214,144 @@ class OperatorFactory(ABC):
         return result
 
 
-class DAGBuilder:
-    """Builder for creating Airflow DAGs from configuration."""
+class BaseDAGBuilder(ABC):
+    """Abstract base class for DAG builders."""
     
-    def __init__(self, dag_config_id: int):
-        """
-        Initialize the DAG builder.
-        
-        Args:
-            dag_config_id: The ID of the DAG configuration
-        """
-        self.dag_config_id = dag_config_id
-        self.dag_repo = DAGConfigurationRepository()
-        self.task_repo = TaskConfigurationRepository()
-        self.dep_repo = TaskDependencyRepository()
+    def __init__(self):
         self.operator_factories: Dict[str, OperatorFactory] = {}
-        
+    
     def register_operator_factory(self, task_type: str, factory: OperatorFactory) -> None:
-        """
-        Register an operator factory for a task type.
-        
-        Args:
-            task_type: The task type identifier
-            factory: The operator factory
-        """
+        """Register an operator factory for a task type."""
         self.operator_factories[task_type] = factory
-        
-    def build(self) -> DAG:
-        """
-        Build an Airflow DAG from configuration.
-        
-        Returns:
-            An Airflow DAG instance
-        """
-        # Get DAG configuration
-        dag_config = self.dag_repo.get_dag_config(self.dag_config_id)
+    
+    @abstractmethod
+    def build(self) -> Optional[DAG]:
+        """Build and return a DAG."""
+        pass
+    
+    def _create_task_operator(self, task_type: str, task_id: str, config: Dict[str, Any], dag: DAG) -> Optional[BaseOperator]:
+        """Create an operator instance."""
+        factory = self.operator_factories.get(task_type)
+        if not factory:
+            return None
+        return factory.create_operator(task_id, config, dag)
+
+
+class ConfigBasedDAGBuilder(BaseDAGBuilder):
+    """Base class for configuration-based DAG builders."""
+    
+    @abstractmethod
+    def _get_dag_config(self) -> Optional[Dict[str, Any]]:
+        """Get the DAG configuration."""
+        pass
+    
+    @abstractmethod
+    def _get_task_configs(self) -> Dict[str, Dict[str, Any]]:
+        """Get task configurations."""
+        pass
+    
+    @abstractmethod
+    def _get_dependencies(self) -> List[Dict[str, Any]]:
+        """Get task dependencies."""
+        pass
+    
+    def build(self) -> Optional[DAG]:
+        """Build DAG from configuration."""
+        # Get configurations
+        dag_config = self._get_dag_config()
         if not dag_config:
-            raise ValueError(f"DAG configuration with ID {self.dag_config_id} not found")
-        
-        # Parse DAG configuration
-        config_details = dag_config.config_details
-        if isinstance(config_details, str):
-            config_details = json.loads(config_details)
-        
+            return None
+            
         # Create DAG
-        dag = self._create_dag(dag_config, config_details)
+        dag = self._create_dag(dag_config)
         
-        # Get tasks
-        tasks = self.task_repo.get_task_configs_by_dag_config(self.dag_config_id)
-        
-        # Create task operators
+        # Create tasks
         task_operators = {}
-        for task in tasks:
-            if not task.is_active:
-                continue
-                
-            operator = self._create_task_operator(task, dag)
+        task_configs = self._get_task_configs()
+        
+        for task_id, task_config in task_configs.items():
+            operator = self._create_task_operator(
+                task_type=task_config['task_type'],
+                task_id=task_id,
+                config=task_config['config'],
+                dag=dag
+            )
             if operator:
-                task_operators[int(task.task_id)] = operator  # Convert to int
+                task_operators[task_id] = operator
         
         # Set up dependencies
-        self._setup_dependencies(task_operators)
+        dependencies = self._get_dependencies()
+        self._setup_dependencies(task_operators, dependencies)
         
         return dag
     
-    def _create_dag(self, dag_config: DAGConfiguration, config_details: Dict[str, Any]) -> DAG:
-        """
-        Create an Airflow DAG from configuration.
-        
-        Args:
-            dag_config: The DAG configuration
-            config_details: The DAG configuration details
-            
-        Returns:
-            An Airflow DAG instance
-        """
-        # Default DAG arguments
-        default_args = {
-            'owner': 'airflow',
-            'depends_on_past': False,
-            'email_on_failure': False,
-            'email_on_retry': False,
-            'retries': 1,
-            'retry_delay': timedelta(minutes=5),
-        }
-        
-        # Override with configuration
-        if 'default_args' in config_details:
-            # Create a copy of default_args to avoid modifying the original
-            default_args_copy = default_args.copy()
-            
-            # Update with configuration default_args
-            for key, value in config_details['default_args'].items():
-                # Special handling for start_date
-                if key == 'start_date' and isinstance(value, str):
-                    try:
-                        # Try to parse as ISO format
-                        value = datetime.fromisoformat(value)
-                    except ValueError:
-                        # If not ISO format, try days_ago format
-                        if value.startswith('days_ago:'):
-                            days = int(value.split(':')[1])
-                            value = days_ago(days)
-                        else:
-                            # If not a recognized format, use days_ago(1)
-                            value = days_ago(1)
-                
-                default_args_copy[key] = value
-            
-            default_args = default_args_copy
-        
-        # Get schedule interval
-        schedule_interval = config_details.get('schedule_interval', '0 0 * * *')
-        
-        # Get start date from default_args
-        start_date = default_args.get('start_date', days_ago(1))
-        
-        # Create DAG
+    def _create_dag(self, config: Dict[str, Any]) -> DAG:
+        """Create DAG instance from configuration."""
         return DAG(
-            dag_id=dag_config.dag_id,
-            default_args=default_args,
-            description=dag_config.description,
-            schedule_interval=schedule_interval,
-            start_date=start_date,
-            catchup=config_details.get('catchup', False),
-            tags=config_details.get('tags', []),
-            max_active_runs=config_details.get('max_active_runs', 1),
+            dag_id=config['dag_id'],
+            description=config.get('description', ''),
+            schedule_interval=config.get('schedule_interval'),
+            default_args=config.get('default_args', {}),
+            catchup=config.get('catchup', False),
+            tags=config.get('tags', []),
+            max_active_runs=config.get('max_active_runs', 1)
         )
     
-    def _create_task_operator(self, task_config: TaskConfiguration, dag: DAG) -> Optional[BaseOperator]:
-        """
-        Create an Airflow operator from task configuration.
-        
-        Args:
-            task_config: The task configuration
-            dag: The DAG instance
-            
-        Returns:
-            An Airflow operator instance or None if no factory is registered
-        """
-        # Get operator factory
-        factory = self.operator_factories.get(task_config.task_type)
-        if not factory:
-            logger.warning(f"No operator factory registered for task type: {task_config.task_type}")
-            return None
-        
-        # Create operator
-        try:
-            return factory.create_operator(task_config, dag)
-        except Exception as e:
-            logger.error(f"Error creating operator for task {task_config.task_id}: {str(e)}")
-            return None
-    
-    def _setup_dependencies(self, task_operators: Dict[int, BaseOperator]) -> None:
-        """
-        Set up task dependencies.
-        
-        Args:
-            task_operators: Dictionary mapping task IDs to operators
-        """
-        # Get dependencies
-        dependencies = self.dep_repo.get_dependencies_by_dag(self.dag_config_id)
-        
-        # Set up dependencies
+    def _setup_dependencies(self, operators: Dict[str, BaseOperator], dependencies: List[Dict[str, Any]]) -> None:
+        """Set up task dependencies."""
         for dep in dependencies:
-            if not dep.is_active:
-                continue
-                
-            # Get operators
-            task_operator = task_operators.get(int(dep.task_id))  # Convert to int
-            depends_on_operator = task_operators.get(int(dep.depends_on_task_id))  # Convert to int
+            upstream_id = dep['upstream_task_id']
+            downstream_id = dep['downstream_task_id']
             
-            if task_operator and depends_on_operator:
-                # Set up dependency based on type
-                if dep.dependency_type == 'success':
-                    task_operator.set_upstream(depends_on_operator)
-                elif dep.dependency_type == 'failure':
-                    task_operator.set_upstream(depends_on_operator, trigger_rule='all_failed')
-                elif dep.dependency_type == 'skip':
-                    task_operator.set_upstream(depends_on_operator, trigger_rule='all_done')
-                elif dep.dependency_type == 'all_done':
-                    task_operator.set_upstream(depends_on_operator, trigger_rule='all_done')
-                else:
-                    # Default to success
-                    task_operator.set_upstream(depends_on_operator) 
+            if upstream_id in operators and downstream_id in operators:
+                operators[upstream_id] >> operators[downstream_id]
+
+class DAGBuilder(ConfigBasedDAGBuilder):
+    """Concrete DAG builder for database-backed configurations."""
+    
+    def __init__(self, flow_id: str):
+        super().__init__()
+        self.flow_id = flow_id
+        self.flow_repo = FlowConfigurationRepository()
+        self.task_repo = TaskConfigurationRepository()
+        self.dep_repo = TaskDependencyRepository()
+    
+    def _get_dag_config(self) -> Optional[Dict[str, Any]]:
+        """Get DAG configuration from database."""
+        flow_config = self.flow_repo.get_flow_config_by_id(self.flow_id)
+        if not flow_config:
+            return None
+            
+        return {
+            'dag_id': flow_config.flow_id,
+            'description': flow_config.description,
+            'schedule_interval': flow_config.config_details.get('schedule_interval'),
+            'default_args': flow_config.config_details.get('default_args', {}),
+            'catchup': flow_config.config_details.get('catchup', False),
+            'tags': flow_config.config_details.get('tags', []),
+            'max_active_runs': flow_config.config_details.get('max_active_runs', 1)
+        }
+    
+    def _get_task_configs(self) -> Dict[str, Dict[str, Any]]:
+        """Get task configurations from database."""
+        tasks = self.task_repo.get_task_configs_by_flow_id(self.flow_id)
+        return {
+            str(task.task_id): {
+                'task_type': task.task_type,
+                'config': task.config_details
+            }
+            for task in tasks
+            if task.is_active
+        }
+    
+    def _get_dependencies(self) -> List[Dict[str, Any]]:
+        """Get task dependencies from database."""
+        deps = self.dep_repo.get_dependencies_by_flow_id(self.flow_id)
+        return [
+            {
+                'upstream_task_id': str(dep.task_id),
+                'downstream_task_id': str(dep.depends_on_task_id)
+            }
+            for dep in deps
+            if dep.is_active
+        ] 

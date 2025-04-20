@@ -116,4 +116,20 @@ class TaskExecution(Base):
 
     # Relationships
     flow_execution = relationship("FlowExecution", back_populates="task_executions")
-    task = relationship("TaskConfiguration") 
+    task = relationship("TaskConfiguration")
+
+class TaskType(Base):
+    __tablename__ = 'task_type'
+    __table_args__ = {'schema': 'theflows'}
+
+    type_id = Column(BigInteger, primary_key=True)
+    name = Column(Text, nullable=False)
+    type_key = Column(Text, nullable=False, unique=True)  # e.g., 'python', 'bash'
+    description = Column(Text)
+    plugin_source = Column(Text, nullable=False)  # e.g., 'airflow_plugin', 'custom'
+    config_schema = Column(JSONB, nullable=False)  # JSON Schema for task configuration
+    default_config = Column(JSONB)  # Default configuration values
+    icon = Column(Text)  # Optional icon identifier
+    created_dt = Column(DateTime, server_default='now()', nullable=False)
+    updated_dt = Column(DateTime, server_default='now()', nullable=False)
+    is_active = Column(Boolean, default=True) 

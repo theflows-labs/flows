@@ -144,45 +144,109 @@ class AthenaQueryOperatorFactory(OperatorFactory):
             "check_interval": 30
         }
     
-    def create_operator(self, task_config: TaskConfiguration, dag) -> BaseOperator:
+    def create_operator(self, task_id: str, config: Dict[str, Any], dag: Any) -> BaseOperator:
+        """Create an operator instance."""
+        return self.get_operator_class(self.TASK_TYPE)(
+            task_id=task_id,
+            dag=dag,
+            **config
+        )
+
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get JSON schema for operator configuration."""
+        return {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "SQL query to execute"
+                },
+                "database": {
+                    "type": "string",
+                    "description": "Athena database name"
+                },
+                "output_location": {
+                    "type": "string",
+                    "description": "S3 location for query results"
+                },
+                "aws_conn_id": {
+                    "type": "string",
+                    "description": "AWS connection ID",
+                    "default": "aws_default"
+                },
+                "workgroup": {
+                    "type": "string",
+                    "description": "Athena workgroup to use",
+                    "default": "primary"
+                },
+                "query_execution_context": {
+                    "type": "object",
+                    "description": "Query execution context",
+                    "properties": {
+                        "database": {"type": "string"},
+                        "catalog": {"type": "string"}
+                    }
+                },
+                "result_configuration": {
+                    "type": "object",
+                    "description": "Result configuration",
+                    "properties": {
+                        "output_location": {"type": "string"},
+                        "encryption_configuration": {
+                            "type": "object",
+                            "properties": {
+                                "encryption_option": {"type": "string"},
+                                "kms_key": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            },
+            "required": ["query", "database", "output_location"]
+        }
+
+    @classmethod
+    def get_default_config(cls) -> Dict[str, Any]:
+        """Get default configuration values."""
+        return {
+            "aws_conn_id": "aws_default",
+            "workgroup": "primary",
+            "query_execution_context": {},
+            "result_configuration": {}
+        }
+
+    @classmethod
+    def get_icon(cls) -> str:
+        """Get icon identifier for the UI."""
+        return 'athena'
+
+    def _validate_parameters(self, config_details: Dict[str, Any]) -> None:
         """
-        Create an Athena query operator from task configuration.
+        Validate the parameters for the operator.
         
         Args:
-            task_config: The task configuration
-            dag: The DAG instance
-            
-        Returns:
-            An Athena operator instance
+            config_details: The configuration details
             
         Raises:
             ValueError: If required parameters are missing or invalid
         """
-        # Parse task configuration
-        config_details = task_config.config_details
-        if isinstance(config_details, str):
-            config_details = json.loads(config_details)
+        for param in self.get_required_parameters():
+            if param not in config_details:
+                raise ValueError(f"Missing required parameter: {param}")
+
+    def _apply_defaults(self, config_details: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply default values to the configuration.
         
-        # Validate required parameters
-        self._validate_parameters(config_details)
-        
-        # Extract parameters with defaults
-        params = self._apply_defaults(config_details)
-        
-        # Create operator
-        return AthenaOperator(
-            task_id=f"athena_query_{task_config.task_id}",
-            query=params["query"],
-            database=params["database"],
-            output_location=params["output_location"],
-            aws_conn_id=params["aws_conn_id"],
-            region_name=params["region_name"],
-            workgroup=params["workgroup"],
-            query_execution_context=params["query_execution_context"],
-            result_configuration=params["result_configuration"],
-            client_request_token=params["client_request_token"],
-            sleep_time=params["sleep_time"],
-            #max_tries=params["max_tries"],
-            #check_interval=params["check_interval"],
-            dag=dag
-        ) 
+        Args:
+            config_details: The configuration details
+            
+        Returns:
+            The updated configuration
+        """
+        params = config_details.copy()
+        for param, default_value in self.get_optional_parameters().items():
+            if param not in params:
+                params[param] = default_value
+        return params 

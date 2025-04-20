@@ -2,10 +2,16 @@ from flask import Blueprint, request, jsonify
 from .services.flow_service import FlowService
 from .services.task_service import TaskService
 from .services.execution_service import ExecutionService
+from .services.task_type_service import TaskTypeService
+import logging
 
+logger = logging.getLogger(__name__)
+
+# Create blueprints
 flow_bp = Blueprint('flow', __name__)
 task_bp = Blueprint('task', __name__)
 execution_bp = Blueprint('execution', __name__)
+task_type_bp = Blueprint('task_type', __name__)
 
 # Flow Routes
 @flow_bp.route('/', methods=['GET'])
@@ -43,10 +49,11 @@ def get_flow_yaml(flow_id):
 # Task Routes
 @task_bp.route('/types', methods=['GET'])
 def get_task_types():
-    types = TaskService.get_task_types()
-    return jsonify(types)
+    """Get all task types."""
+    task_types = TaskService.get_task_types()
+    return jsonify(task_types)
 
-@task_bp.route('/<task_id>', methods=['GET'])
+@task_bp.route('/<int:task_id>', methods=['GET'])
 def get_task(task_id):
     task = TaskService.get_task(task_id)
     return jsonify(task)
@@ -58,7 +65,7 @@ def create_task():
     return jsonify(task), 201
 
 @task_bp.route('/<int:task_id>', methods=['PUT'])
-def update_task():
+def update_task(task_id):
     data = request.json
     task = TaskService.update_task(task_id, data)
     return jsonify(task)
@@ -94,4 +101,26 @@ def get_execution_status(execution_id):
 @execution_bp.route('/<execution_id>/logs', methods=['GET'])
 def get_execution_logs(execution_id):
     logs = ExecutionService.get_execution_logs(execution_id)
-    return jsonify(logs) 
+    return jsonify(logs)
+
+# Task Type Routes
+@task_type_bp.route('/', methods=['GET'])
+def get_task_types():
+    """Get all task types."""
+    task_types = TaskTypeService().get_task_types()
+    return jsonify(task_types)
+
+@task_type_bp.route('/refresh', methods=['POST'])
+def refresh_task_types():
+    """Scan plugins and refresh task types."""
+    logger.info("Received request to refresh task types")
+    try:
+        task_types = TaskTypeService().refresh_task_types()
+        logger.info(f"Successfully refreshed {len(task_types)} task types")
+        return jsonify(task_types)
+    except Exception as e:
+        logger.error(f"Error refreshing task types: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# Export all blueprints
+__all__ = ['flow_bp', 'task_bp', 'execution_bp', 'task_type_bp'] 
