@@ -14,8 +14,8 @@ from airflow.models import BaseOperator
 from core.repositories import FlowConfigurationRepository
 from orchestration.airflow_plugin.plugin_core.dag_builder.base import DAGBuilder
 from orchestration.airflow_plugin.plugin_core.dag_builder.registry import OperatorRegistry
-from .base import BaseDAGBuilder
-from .yaml_builder import YAMLDAGBuilder
+from orchestration.airflow_plugin.plugin_core.dag_builder.base import BaseDAGBuilder
+from orchestration.airflow_plugin.plugin_core.dag_builder.yaml_builder import YAMLDAGBuilder
 
 logger = logging.getLogger(__name__)
 

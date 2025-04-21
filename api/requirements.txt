@@ -1,4 +1,0 @@
-# Database
-flask_cors==5.0.0
-flask==3.0.2
-sqlalchemy==2.0.31

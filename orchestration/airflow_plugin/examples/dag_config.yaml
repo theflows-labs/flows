@@ -1,44 +1,40 @@
-dags:
-  example_dag:
-    description: "An example DAG with multiple tasks"
-    is_active: true
+version: '1.0'
+flow:
+  id: testr2
+  description: this is test 2
+  tasks:
+  - id: 7
+    type: s3_list
+    name: delete1
+    description: delete1
     config:
-      schedule_interval: "0 0 * * *"
-      start_date: "2024-01-01"
-      catchup: false
-      max_active_runs: 1
-      default_args:
-        owner: "airflow"
-    
-    tasks:
-      task_1:
-        type: "s3_list"
-        is_active: true
-        config:
-          bucket: "test-bucket"
-          
-      
-      task_2:
-        type: "s3_list"
-        is_active: true
-        config:
-          bucket: "test-bucket"
-          
-      
-      task_3:
-        type: "s3_list"
-        is_active: true
-        config:
-          bucket: "test-bucket"
-          
-    
-    dependencies:
-      - task_id: "task_2"
-        depends_on_task_id: "task_1"
-        type: "success"
-        is_active: true
-      
-      - task_id: "task_3"
-        depends_on_task_id: "task_2"
-        type: "success"
-        is_active: true 
+      bucket: 's3-tst'
+    sequence: 1
+  - id: 8
+    type: s3_list
+    name: list1
+    description: list1
+    config:
+      bucket: 's3-test'
+    sequence: 1
+  - id: 9
+    type: bash
+    name: bash1
+    description: bash1
+    config:
+      bash_command: 'echo test'
+    sequence: 1
+  dependencies:
+  - from: 7
+    to: 8
+    type: success
+    condition: null
+  - from: 8
+    to: 9
+    type: success
+    condition: null
+metadata:
+  created_at: '2025-04-20T00:42:23.759480'
+  updated_at: '2025-04-20T00:42:23.759480'
+  version: '1.0'
+  engine: airflow

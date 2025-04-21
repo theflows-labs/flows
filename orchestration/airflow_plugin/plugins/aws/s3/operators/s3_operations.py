@@ -265,12 +265,61 @@ class S3ListOperatorFactory(OperatorFactory):
     def get_operator_class(cls, task_type: str) -> Type[BaseOperator]:
         return S3ListOperator
 
+    # def create_operator(self, task_id: str, config: Dict[str, Any], dag: Any) -> BaseOperator:
+    #     return self.get_operator_class(self.TASK_TYPE)(
+    #         task_id=task_id,
+    #         dag=dag,
+    #         **config
+    #     )
+
     def create_operator(self, task_id: str, config: Dict[str, Any], dag: Any) -> BaseOperator:
+        # Add required parameters if not present
+        if 'bucket' not in config:
+            logger.error(f"Missing required parameter 'bucket' for task {task_id}")
+            raise ValueError("Missing required parameter: bucket")
+        
+        operator_config = {
+            'bucket': config.get('bucket'),
+            'prefix': config.get('prefix', ''),
+            'delimiter': config.get('delimiter', '/'),
+            'aws_conn_id': config.get('aws_conn_id', 'aws_default'),
+            'max_items': config.get('max_items', 1000)
+        }
+
         return self.get_operator_class(self.TASK_TYPE)(
-            task_id=task_id,
-            dag=dag,
-            **config
+                task_id=task_id,
+                dag=dag,
+                **operator_config
         )
+        
+        # config_details = self._parse_config_details(task_config.config_details)
+        # self._validate_parameters(config_details)
+        # config_details = self._apply_defaults(config_details)
+        
+        # return self.get_operator_class(task_config.task_type)(
+        #     task_id=f"s3_list_{task_config.task_id}",
+        #     dag=dag,
+        #     **config_details
+        # )
+
+        logger.info(f"Creating S3ListOperator with config: {operator_config}")
+        return S3ListOperator(**operator_config)
+            
+        # Ensure all parameters are properly set
+        # operator_config = {
+        #     'task_id': task_id,
+        #     'dag': dag,
+        #     'bucket': config.get('bucket'),
+        #     'prefix': config.get('prefix', ''),
+        #     'delimiter': config.get('delimiter', '/'),
+        #     'aws_conn_id': config.get('aws_conn_id', 'aws_default'),
+        #     'max_items': config.get('max_items', 1000)
+        # }
+        
+        # logger.info(f"Creating S3ListOperator with config: {operator_config}")
+        # return S3ListOperator(**operator_config)
+
+    
 
     @classmethod
     def get_config_schema(cls) -> Dict[str, Any]:
