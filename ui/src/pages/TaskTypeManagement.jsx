@@ -17,14 +17,21 @@ import {
   DialogActions,
   CircularProgress,
   Alert,
-  Snackbar
+  Snackbar,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TablePagination,
+  InputAdornment
 } from '@mui/material';
 import { 
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
-  Code as CodeIcon
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { useTaskTypeStore } from '../stores/taskTypeStore';
 import JsonSchemaForm from '../components/JsonSchemaForm';
@@ -51,8 +58,7 @@ const taskTypeSchema = {
     plugin_source: { 
       type: 'string', 
       title: 'Plugin Source',
-      enum: ['airflow', 'custom'],
-      description: 'Source of the task type implementation'
+      description: 'Source of the task type implementation (e.g., airflow, aws, custom)'
     },
     config_schema: { 
       type: 'object', 
@@ -97,6 +103,15 @@ const TaskTypeManagement = () => {
   const [selectedTaskType, setSelectedTaskType] = useState(null);
   const [formError, setFormError] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  
+  // Search and filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
 
   useEffect(() => {
     console.log('Fetching task types...');
@@ -109,6 +124,56 @@ const TaskTypeManagement = () => {
       });
     });
   }, [fetchTaskTypes]);
+
+  // Filter and paginate task types
+  const filteredTaskTypes = React.useMemo(() => {
+    console.log('Filtering task types with:', {
+      searchTerm,
+      typeFilter,
+      sourceFilter,
+      totalTaskTypes: taskTypes.length
+    });
+
+    return taskTypes.filter(taskType => {
+      const matchesSearch = searchTerm === '' || 
+        taskType.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        taskType.type_key?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesType = typeFilter === 'all' || 
+        taskType.type_key === typeFilter;
+      
+      const matchesSource = sourceFilter === 'all' || 
+        taskType.plugin_source === sourceFilter;
+
+      const isMatch = matchesSearch && matchesType && matchesSource;
+      
+      if (isMatch) {
+        console.log('Matched task type:', {
+          name: taskType.name,
+          type_key: taskType.type_key,
+          plugin_source: taskType.plugin_source
+        });
+      }
+
+      return isMatch;
+    });
+  }, [taskTypes, searchTerm, typeFilter, sourceFilter]);
+
+  const paginatedTaskTypes = React.useMemo(() => {
+    return filteredTaskTypes.slice(
+      page * rowsPerPage,
+      page * rowsPerPage + rowsPerPage
+    );
+  }, [filteredTaskTypes, page, rowsPerPage]);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   const handleCreate = () => {
     setSelectedTaskType(null);
@@ -191,6 +256,62 @@ const TaskTypeManagement = () => {
         </Alert>
       )}
 
+      {/* Search and Filter Controls */}
+      <Box display="flex" gap={2} mb={3}>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Search by name or type key..."
+          value={searchTerm}
+          onChange={(e) => {
+            console.log('Search term changed:', e.target.value);
+            setSearchTerm(e.target.value);
+            setPage(0); // Reset to first page when search changes
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <FormControl sx={{ minWidth: 150 }}>
+          <InputLabel>Type</InputLabel>
+          <Select
+            value={typeFilter}
+            label="Type"
+            onChange={(e) => {
+              console.log('Type filter changed:', e.target.value);
+              setTypeFilter(e.target.value);
+              setPage(0); // Reset to first page when filter changes
+            }}
+          >
+            <MenuItem value="all">All Types</MenuItem>
+            {[...new Set(taskTypes.map(tt => tt.type_key).filter(Boolean))].map(type => (
+              <MenuItem key={type} value={type}>{type}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl sx={{ minWidth: 150 }}>
+          <InputLabel>Source</InputLabel>
+          <Select
+            value={sourceFilter}
+            label="Source"
+            onChange={(e) => {
+              console.log('Source filter changed:', e.target.value);
+              setSourceFilter(e.target.value);
+              setPage(0); // Reset to first page when filter changes
+            }}
+          >
+            <MenuItem value="all">All Sources</MenuItem>
+            {[...new Set(taskTypes.map(tt => tt.plugin_source).filter(Boolean))].map(source => (
+              <MenuItem key={source} value={source}>{source}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+
       {loading ? (
         <Box display="flex" justifyContent="center" p={3}>
           <CircularProgress />
@@ -208,14 +329,14 @@ const TaskTypeManagement = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {taskTypes.length === 0 ? (
+              {paginatedTaskTypes.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center">
-                    No task types found. Click "Add Task Type" to create one.
+                    No task types found matching your criteria.
                   </TableCell>
                 </TableRow>
               ) : (
-                taskTypes.map((taskType) => (
+                paginatedTaskTypes.map((taskType) => (
                   <TableRow key={taskType.type_key}>
                     <TableCell>{taskType.name}</TableCell>
                     <TableCell>{taskType.type_key}</TableCell>
@@ -239,6 +360,15 @@ const TaskTypeManagement = () => {
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            component="div"
+            count={filteredTaskTypes.length}
+            page={page}
+            onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+          />
         </Card>
       )}
 
