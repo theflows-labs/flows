@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: flows
+      POSTGRES_PASSWORD: flows123
+      POSTGRES_DB: flows_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flows -d flows_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - flows-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      - DATABASE_URL=postgresql://flows:flows123@postgres:5432/flows_db
+      - SQLALCHEMY_DATABASE_URI=postgresql://flows:flows123@postgres:5432/flows_db
+      - FLASK_APP=api/app.py
+      - FLASK_ENV=development
+      - ALEMBIC_CONFIG=/app/metadata/alembic/alembic.ini
+      - POSTGRES_DB=flows_db
+      - POSTGRES_USER=flows
+      - POSTGRES_PASSWORD=flows123
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - FLASK_RUN_HOST=0.0.0.0
+      - FLASK_RUN_PORT=5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./api:/app/api
+      - ./orchestration:/app/orchestration
+      - ./metadata:/app/metadata
+    networks:
+      - flows-network
+    command: >
+      sh -c "sleep 5 && 
+             cd /app/metadata/alembic && 
+             PYTHONPATH=/app alembic -c /app/metadata/alembic/alembic.ini upgrade head && 
+             cd /app && 
+             flask run --host=0.0.0.0"
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    environment:
+      - REACT_APP_API_URL=http://api:5000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ui/src:/app/src
+      - ./ui/public:/app/public
+      - ./ui/index.html:/app/index.html
+      - ./ui/vite.config.js:/app/vite.config.js
+    depends_on:
+      - api
+    networks:
+      - flows-network
+    command: ["npm", "run", "dev"]
+
+networks:
+  flows-network:
+    driver: bridge
+
+volumes:
+  postgres_data: 
