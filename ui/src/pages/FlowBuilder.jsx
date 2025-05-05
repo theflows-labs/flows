@@ -181,18 +181,18 @@ const FlowBuilder = () => {
     return maxSourceSequence + 1;
   };
 
-  const handleRunFlow = async () => {
-    try {
-      const response = await fetch(`/api/executions/${flowId}`, {
-        method: 'POST',
-      });
-      const result = await response.json();
-      showNotification('Flow execution started');
-      // Optionally navigate to execution details page
-    } catch (error) {
-      showNotification('Error starting flow execution', 'error');
-    }
-  };
+  // const handleRunFlow = async () => {
+  //   try {
+  //     const response = await fetch(`/api/executions/${flowId}`, {
+  //       method: 'POST',
+  //     });
+  //     const result = await response.json();
+  //     showNotification('Flow execution started');
+  //     // Optionally navigate to execution details page
+  //   } catch (error) {
+  //     showNotification('Error starting flow execution', 'error');
+  //   }
+  // };
 
   const showNotification = (message, severity = 'success') => {
     setNotification({ open: true, message, severity });
@@ -240,7 +240,7 @@ const FlowBuilder = () => {
               >
                 Save
               </Button>
-              {flowId && (
+              {/* {flowId && (
                 <Button
                   variant="contained"
                   color="secondary"
@@ -249,7 +249,7 @@ const FlowBuilder = () => {
                 >
                   Run
                 </Button>
-              )}
+              )} */}
             </Panel>
           </ReactFlow>
         </Box>

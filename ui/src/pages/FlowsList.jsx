@@ -74,17 +74,17 @@ const FlowsList = () => {
     }
   };
 
-  const handleRunFlow = async (flowId) => {
-    try {
-      const response = await fetch(`/api/executions/${flowId}`, {
-        method: 'POST',
-      });
-      if (!response.ok) throw new Error('Failed to start flow execution');
-      // Optionally show success message or redirect to execution page
-    } catch (error) {
-      console.error('Error running flow:', error);
-    }
-  };
+  // const handleRunFlow = async (flowId) => {
+  //   try {
+  //     const response = await fetch(`/api/executions/${flowId}`, {
+  //       method: 'POST',
+  //     });
+  //     if (!response.ok) throw new Error('Failed to start flow execution');
+  //     // Optionally show success message or redirect to execution page
+  //   } catch (error) {
+  //     console.error('Error running flow:', error);
+  //   }
+  // };
 
   const filteredFlows = flows.filter(flow => {
     const matchesSearch = flow.flow_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -187,22 +187,22 @@ const FlowsList = () => {
                 </Box>
               </CardContent>
               <CardActions sx={{ justifyContent: 'flex-end' }}>
-                <Tooltip title="View Execution History">
+                {/* <Tooltip title="View Execution History">
                   <IconButton 
                     size="small"
                     onClick={() => navigate(`/flows/${flow.flow_id}/executions`)}
                   >
                     <HistoryIcon />
                   </IconButton>
-                </Tooltip>
-                <Tooltip title="Run Flow">
+                </Tooltip> */}
+                {/* <Tooltip title="Run Flow">
                   <IconButton 
                     size="small"
                     onClick={() => handleRunFlow(flow.flow_id)}
                   >
                     <RunIcon />
                   </IconButton>
-                </Tooltip>
+                </Tooltip> */}
                 <Tooltip title="Edit Flow">
                   <IconButton 
                     size="small"
