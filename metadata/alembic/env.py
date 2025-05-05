@@ -13,15 +13,15 @@ from pathlib import Path
 plugin_dir = Path(__file__).parent.parent.parent  # Go up one more level to reach airflow_plugin
 sys.path.insert(0, str(plugin_dir))
 
-# Set environment variables for database connection
-os.environ['DB_USER'] = 'postgress'
-os.environ['DB_PASSWORD'] = 'postgress'
-os.environ['DB_HOST'] = 'localhost'
-os.environ['DB_PORT'] = '5433'
-os.environ['DB_NAME'] = 'postgress'
+# Get database connection details from environment variables
+DB_USER = os.getenv('POSTGRES_USER', 'flows')
+DB_PASSWORD = os.getenv('POSTGRES_PASSWORD', 'flows123')
+DB_HOST = os.getenv('POSTGRES_HOST', 'postgres')
+DB_PORT = os.getenv('POSTGRES_PORT', '5432')
+DB_NAME = os.getenv('POSTGRES_DB', 'flows_db')
 
-# Import database constants
-from config.database import SQLALCHEMY_CONN
+# Construct the database URL
+SQLALCHEMY_CONN = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -36,7 +36,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 target_metadata = None
 
-# Override sqlalchemy.url with the centralized connection string
+# Override sqlalchemy.url with the environment-based connection string
 print(f"Using database connection: {SQLALCHEMY_CONN}")
 config.set_main_option("sqlalchemy.url", SQLALCHEMY_CONN)
 

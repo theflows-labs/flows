@@ -19,6 +19,9 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = SQLALCHEMY_TRACK_MODIFICATIONS
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = SQLALCHEMY_ENGINE_OPTIONS
 
+    # Configure URL handling
+    app.url_map.strict_slashes = False
+
     # Register blueprints
     app.register_blueprint(flow_bp, url_prefix='/api/flows')
     app.register_blueprint(task_bp, url_prefix='/api/tasks')
