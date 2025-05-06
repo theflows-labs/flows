@@ -75,6 +75,23 @@ class FlowConfigurationRepository:
         finally:
             session.close()
 
+
+    def update_flow_status(self, config_id: int, is_active: bool) -> Optional[FlowConfiguration]:
+        """Update a Flow configuration."""
+        session = self.Session()
+        try:
+            flow_config = session.query(FlowConfiguration).filter(FlowConfiguration.config_id == config_id).first()
+            if is_active:
+                flow_config.is_active = True
+            else:
+                flow_config.is_active = False
+                
+                session.commit()
+                session.refresh(flow_config)
+            return flow_config
+        finally:
+            session.close()        
+
     def delete_flow_config(self, config_id: int) -> bool:
         """Delete a Flow configuration and its associated tasks."""
         session = self.Session()
@@ -95,6 +112,14 @@ class FlowConfigurationRepository:
             return session.query(FlowConfiguration).filter_by(is_active=True).all()
         finally:
             session.close()
+
+    def get_all_flow_configs(self) -> List[FlowConfiguration]:
+        """Get all active Flow configurations."""
+        session = self.Session()
+        try:
+            return session.query(FlowConfiguration).all()
+        finally:
+            session.close()        
 
 class TaskConfigurationRepository:
     def __init__(self):

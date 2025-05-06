@@ -54,6 +54,34 @@ def get_flow_yaml(flow_id):
         'Content-Disposition': f'attachment; filename=flow-{flow_id}.yaml'
     }
 
+@flow_bp.route('/<flow_id>/activate', methods=['POST'])
+def activate_flow(flow_id):
+    try:
+        logger.info(f"Attempting to activate flow: {flow_id}")
+        flow = FlowService.activate_flow(flow_id)
+        if not flow:
+            logger.warning(f"Flow not found: {flow_id}")
+            return jsonify({'error': 'Flow not found'}), 404
+        logger.info(f"Successfully activated flow: {flow_id}")
+        return jsonify(flow)
+    except Exception as e:
+        logger.error(f"Error activating flow {flow_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@flow_bp.route('/<flow_id>/deactivate', methods=['POST'])
+def deactivate_flow(flow_id):
+    try:
+        logger.info(f"Attempting to deactivate flow: {flow_id}")
+        flow = FlowService.deactivate_flow(flow_id)
+        if not flow:
+            logger.warning(f"Flow not found: {flow_id}")
+            return jsonify({'error': 'Flow not found'}), 404
+        logger.info(f"Successfully deactivated flow: {flow_id}")
+        return jsonify(flow)
+    except Exception as e:
+        logger.error(f"Error deactivating flow {flow_id}: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 # Task Routes
 @task_bp.route('/types', methods=['GET'])
 def get_task_types():

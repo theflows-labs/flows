@@ -13,7 +13,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://api:5000',
+        target: 'http://localhost:5000', // 'http://api:5000' for docker dev
         changeOrigin: true,
         secure: false,
         followRedirects: true,

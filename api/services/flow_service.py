@@ -2,6 +2,9 @@ from typing import Dict, List, Optional, Any
 from core.repositories.repository import FlowConfigurationRepository, TaskConfigurationRepository
 from core.models.models import FlowConfiguration, TaskConfiguration
 import yaml
+import logging
+
+logger = logging.getLogger(__name__)
 
 class FlowService:
     def __init__(self):
@@ -10,6 +13,13 @@ class FlowService:
 
     @classmethod
     def get_all_flows(cls) -> List[Dict[str, Any]]:
+        """Get all active flows."""
+        service = cls()
+        flows = service.flow_repo.get_all_flow_configs()
+        return [service._flow_to_dict(flow) for flow in flows]    
+
+    @classmethod
+    def get_all_activeflows(cls) -> List[Dict[str, Any]]:
         """Get all active flows."""
         service = cls()
         flows = service.flow_repo.get_all_active_flow_configs()
@@ -141,4 +151,60 @@ class FlowService:
             'created_dt': flow.created_dt.isoformat() if flow.created_dt else None,
             'updated_dt': flow.updated_dt.isoformat() if flow.updated_dt else None,
             'is_active': flow.is_active
-        } 
+        }
+
+    @classmethod
+    def activate_flow(cls, flow_id: str):
+        """Activate a flow by setting its is_active flag to True."""
+        logger.info(f"Activating flow: {flow_id}")
+        try:
+            service = cls()
+            # Get the flow configuration
+            flow = service.flow_repo.get_flow_config_by_flow_id(flow_id)
+            if not flow:
+                logger.warning(f"Flow not found: {flow_id}")
+                return None
+
+            # Update the flow configuration using the repository
+            updated_flow = service.flow_repo.update_flow_status(
+                config_id=flow.config_id,
+                is_active=True
+            )
+            
+            if not updated_flow:
+                logger.error(f"Failed to activate flow: {flow_id}")
+                return None
+            
+            logger.info(f"Successfully activated flow: {flow_id}")
+            return service._flow_to_dict(updated_flow)
+        except Exception as e:
+            logger.error(f"Error activating flow {flow_id}: {str(e)}")
+            raise
+
+    @classmethod
+    def deactivate_flow(cls, flow_id: str):
+        """Deactivate a flow by setting its is_active flag to False."""
+        logger.info(f"Deactivating flow: {flow_id}")
+        try:
+            service = cls()
+            # Get the flow configuration
+            flow = service.flow_repo.get_flow_config_by_flow_id(flow_id)
+            if not flow:
+                logger.warning(f"Flow not found: {flow_id}")
+                return None
+
+            # Update the flow configuration using the repository
+            updated_flow = service.flow_repo.update_flow_status(
+                config_id=flow.config_id,
+                is_active=False
+            )
+            
+            if not updated_flow:
+                logger.error(f"Failed to deactivate flow: {flow_id}")
+                return None
+            
+            logger.info(f"Successfully deactivated flow: {flow_id}")
+            return service._flow_to_dict(updated_flow)
+        except Exception as e:
+            logger.error(f"Error deactivating flow {flow_id}: {str(e)}")
+            raise 

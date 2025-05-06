@@ -19,6 +19,7 @@ import {
   Tooltip,
   InputAdornment,
   MenuItem,
+  Switch,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -29,12 +30,13 @@ import {
   History as HistoryIcon,
   FilterList as FilterIcon,
   Download as DownloadIcon,
+  PowerSettingsNew as PowerIcon,
 } from '@mui/icons-material';
 import useFlowStore from '../stores/flowStore';
 
 const FlowsList = () => {
   const navigate = useNavigate();
-  const { flows, fetchFlows, deleteFlow, downloadFlowYAML } = useFlowStore();
+  const { flows, fetchFlows, deleteFlow, downloadFlowYAML, activateFlow, deactivateFlow } = useFlowStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -43,6 +45,8 @@ const FlowsList = () => {
   });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedFlow, setSelectedFlow] = useState(null);
+  const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false);
+  const [toggleAction, setToggleAction] = useState(null);
 
   useEffect(() => {
     fetchFlows();
@@ -74,24 +78,49 @@ const FlowsList = () => {
     }
   };
 
-  // const handleRunFlow = async (flowId) => {
-  //   try {
-  //     const response = await fetch(`/api/executions/${flowId}`, {
-  //       method: 'POST',
-  //     });
-  //     if (!response.ok) throw new Error('Failed to start flow execution');
-  //     // Optionally show success message or redirect to execution page
-  //   } catch (error) {
-  //     console.error('Error running flow:', error);
-  //   }
-  // };
+  const handleToggleActive = async (flow) => {
+    setSelectedFlow(flow);
+    setToggleAction(flow.is_active ? 'deactivate' : 'activate');
+    setToggleConfirmOpen(true);
+  };
+
+  const handleToggleConfirm = async () => {
+    try {
+      if (toggleAction === 'activate') {
+        await activateFlow(selectedFlow.flow_id);
+      } else {
+        await deactivateFlow(selectedFlow.flow_id);
+      }
+      setToggleConfirmOpen(false);
+      setSelectedFlow(null);
+      setToggleAction(null);
+    } catch (error) {
+      console.error('Error toggling flow status:', error);
+    }
+  };
 
   const filteredFlows = flows.filter(flow => {
+    // Search term filter
     const matchesSearch = flow.flow_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          flow.description?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Add more filter conditions as needed
-    return matchesSearch;
+    // Status filter
+    const matchesStatus = filters.status === 'all' || 
+                         (filters.status === 'active' && flow.is_active) ||
+                         (filters.status === 'inactive' && !flow.is_active);
+    
+    // Date range filter
+    const createdDate = new Date(flow.created_dt);
+    const now = new Date();
+    const matchesDateRange = filters.dateRange === 'all' ||
+                            (filters.dateRange === 'today' && 
+                             createdDate.toDateString() === now.toDateString()) ||
+                            (filters.dateRange === 'week' && 
+                             (now - createdDate) <= 7 * 24 * 60 * 60 * 1000) ||
+                            (filters.dateRange === 'month' && 
+                             (now - createdDate) <= 30 * 24 * 60 * 60 * 1000);
+    
+    return matchesSearch && matchesStatus && matchesDateRange;
   });
 
   return (
@@ -130,7 +159,7 @@ const FlowsList = () => {
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               <Button
                 variant="outlined"
                 startIcon={<FilterIcon />}
@@ -187,22 +216,15 @@ const FlowsList = () => {
                 </Box>
               </CardContent>
               <CardActions sx={{ justifyContent: 'flex-end' }}>
-                {/* <Tooltip title="View Execution History">
+                <Tooltip title={flow.is_active ? "Deactivate Flow" : "Activate Flow"}>
                   <IconButton 
                     size="small"
-                    onClick={() => navigate(`/flows/${flow.flow_id}/executions`)}
+                    onClick={() => handleToggleActive(flow)}
+                    color={flow.is_active ? "success" : "default"}
                   >
-                    <HistoryIcon />
+                    <PowerIcon />
                   </IconButton>
-                </Tooltip> */}
-                {/* <Tooltip title="Run Flow">
-                  <IconButton 
-                    size="small"
-                    onClick={() => handleRunFlow(flow.flow_id)}
-                  >
-                    <RunIcon />
-                  </IconButton>
-                </Tooltip> */}
+                </Tooltip>
                 <Tooltip title="Edit Flow">
                   <IconButton 
                     size="small"
@@ -271,10 +293,7 @@ const FlowsList = () => {
           <Button onClick={() => setFilterDialogOpen(false)}>Cancel</Button>
           <Button 
             variant="contained"
-            onClick={() => {
-              setFilterDialogOpen(false);
-              // Apply filters
-            }}
+            onClick={() => setFilterDialogOpen(false)}
           >
             Apply
           </Button>
@@ -300,6 +319,43 @@ const FlowsList = () => {
             onClick={handleDeleteConfirm}
           >
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Toggle Confirmation Dialog */}
+      <Dialog
+        open={toggleConfirmOpen}
+        onClose={() => {
+          setToggleConfirmOpen(false);
+          setSelectedFlow(null);
+          setToggleAction(null);
+        }}
+      >
+        <DialogTitle>
+          {toggleAction === 'activate' ? 'Activate Flow' : 'Deactivate Flow'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to {toggleAction} the flow "{selectedFlow?.flow_id}"?
+            {/* {toggleAction === 'deactivate' && ' This will stop any running executions.'} */}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => {
+              setToggleConfirmOpen(false);
+              setSelectedFlow(null);
+              setToggleAction(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            color={toggleAction === 'activate' ? 'success' : 'warning'}
+            onClick={handleToggleConfirm}
+          >
+            {toggleAction === 'activate' ? 'Activate' : 'Deactivate'}
           </Button>
         </DialogActions>
       </Dialog>

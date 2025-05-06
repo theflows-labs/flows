@@ -193,6 +193,60 @@ const useFlowStore = create((set) => ({
       throw error;
     }
   },
+
+  activateFlow: async (flowId) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await fetch(`/api/flows/${flowId}/activate`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const updatedFlow = await response.json();
+      set((state) => ({
+        flows: state.flows.map((flow) =>
+          flow.flow_id === flowId ? updatedFlow : flow
+        ),
+        loading: false,
+      }));
+      return updatedFlow;
+    } catch (error) {
+      console.error('Error activating flow:', error);
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
+  deactivateFlow: async (flowId) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await fetch(`/api/flows/${flowId}/deactivate`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const updatedFlow = await response.json();
+      set((state) => ({
+        flows: state.flows.map((flow) =>
+          flow.flow_id === flowId ? updatedFlow : flow
+        ),
+        loading: false,
+      }));
+      return updatedFlow;
+    } catch (error) {
+      console.error('Error deactivating flow:', error);
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
 }));
 
 // Helper function to save tasks and return ID mapping
