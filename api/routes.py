@@ -82,6 +82,16 @@ def deactivate_flow(flow_id):
         logger.error(f"Error deactivating flow {flow_id}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@flow_bp.route('/statistics', methods=['GET'])
+def get_flow_statistics():
+    try:
+        logger.info("Fetching flow statistics")
+        stats = FlowService.get_flow_statistics()
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Error fetching flow statistics: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 # Task Routes
 @task_bp.route('/types', methods=['GET'])
 def get_task_types():

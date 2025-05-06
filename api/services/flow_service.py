@@ -207,4 +207,39 @@ class FlowService:
             return service._flow_to_dict(updated_flow)
         except Exception as e:
             logger.error(f"Error deactivating flow {flow_id}: {str(e)}")
+            raise
+
+    @classmethod
+    def get_flow_statistics(cls):
+        """Get statistics about flows and tasks."""
+        logger.info("Getting flow statistics")
+        try:
+            service = cls()
+            flows = service.flow_repo.get_all_flow_configs()
+            
+            # Calculate flow statistics
+            total_flows = len(flows)
+            active_flows = sum(1 for flow in flows if flow.is_active)
+            inactive_flows = total_flows - active_flows
+            
+            # Calculate task statistics
+            task_types = {}
+            for flow in flows:
+                if flow.config_details and 'nodes' in flow.config_details:
+                    for node in flow.config_details['nodes']:
+                        task_type = node.get('data', {}).get('type', 'unknown')
+                        task_types[task_type] = task_types.get(task_type, 0) + 1
+            
+            return {
+                'flows': {
+                    'total': total_flows,
+                    'active': active_flows,
+                    'inactive': inactive_flows
+                },
+                'tasks': {
+                    'by_type': task_types
+                }
+            }
+        except Exception as e:
+            logger.error(f"Error getting flow statistics: {str(e)}")
             raise 
