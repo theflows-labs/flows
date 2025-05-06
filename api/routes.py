@@ -93,45 +93,72 @@ def get_flow_statistics():
         return jsonify({'error': str(e)}), 500
 
 # Task Routes
-@task_bp.route('/types', methods=['GET'])
-def get_task_types():
-    """Get all task types."""
-    task_types = TaskService.get_task_types()
-    return jsonify(task_types)
+@task_bp.route('/', methods=['GET'])
+def get_tasks():
+    tasks = TaskService.get_all_tasks()
+    return jsonify(tasks)
 
 @task_bp.route('/<int:task_id>', methods=['GET'])
 def get_task(task_id):
     task = TaskService.get_task(task_id)
-    return jsonify(task)
-
-@task_bp.route('/', methods=['POST'])
-def create_task():
-    data = request.json
-    task = TaskService.create_task(data)
-    return jsonify(task), 201
-
-@task_bp.route('/<int:task_id>', methods=['PUT'])
-def update_task(task_id):
-    data = request.json
-    task = TaskService.update_task(task_id, data)
-    return jsonify(task)
-
-@task_bp.route('/dependencies', methods=['POST'])
-def create_dependency():
-    data = request.json
-    dependency = TaskService.create_dependency(data)
-    return jsonify(dependency), 201
-
-@task_bp.route('/dependencies/<int:dependency_id>', methods=['PUT'])
-def update_dependency(dependency_id):
-    data = request.json
-    dependency = TaskService.update_dependency(dependency_id, data)
-    return jsonify(dependency)
+    if task:
+        return jsonify(task)
+    return jsonify({'error': 'Task not found'}), 404
 
 @task_bp.route('/flow/<int:flow_config_id>', methods=['GET'])
 def get_flow_tasks(flow_config_id):
     tasks = TaskService.get_tasks_by_flow_config(flow_config_id)
     return jsonify(tasks)
+
+@task_bp.route('/flow/<string:flow_id>', methods=['GET'])
+def get_flow_tasks_by_flow_id(flow_id):
+    tasks = TaskService.get_tasks_by_flow_id(flow_id)
+    return jsonify(tasks)
+
+@task_bp.route('/', methods=['POST'])
+def create_task():
+    data = request.get_json()
+    task = TaskService.create_task(data)
+    return jsonify(task), 201
+
+@task_bp.route('/<int:task_id>', methods=['PUT'])
+def update_task(task_id):
+    data = request.get_json()
+    task = TaskService.update_task(task_id, data)
+    if task:
+        return jsonify(task)
+    return jsonify({'error': 'Task not found'}), 404
+
+@task_bp.route('/<int:task_id>', methods=['DELETE'])
+def delete_task(task_id):
+    if TaskService.delete_task(task_id):
+        return '', 204
+    return jsonify({'error': 'Task not found'}), 404
+
+@task_bp.route('/types', methods=['GET'])
+def get_task_types():
+    task_types = TaskService.get_task_types()
+    return jsonify(task_types)
+
+@task_bp.route('/dependencies', methods=['POST'])
+def create_dependency():
+    data = request.get_json()
+    dependency = TaskService.create_dependency(data)
+    return jsonify(dependency), 201
+
+@task_bp.route('/dependencies/<int:dependency_id>', methods=['PUT'])
+def update_dependency(dependency_id):
+    data = request.get_json()
+    dependency = TaskService.update_dependency(dependency_id, data)
+    if dependency:
+        return jsonify(dependency)
+    return jsonify({'error': 'Dependency not found'}), 404
+
+@task_bp.route('/dependencies/<int:dependency_id>', methods=['DELETE'])
+def delete_dependency(dependency_id):
+    if TaskService.delete_dependency(dependency_id):
+        return '', 204
+    return jsonify({'error': 'Dependency not found'}), 404
 
 # Execution Routes
 @execution_bp.route('/<flow_id>', methods=['POST'])

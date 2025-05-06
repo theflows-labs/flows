@@ -1,5 +1,5 @@
 from typing import Dict, List, Optional, Any
-from core.repositories.repository import TaskConfigurationRepository, TaskDependencyRepository
+from core.repositories.repository import TaskConfigurationRepository, TaskDependencyRepository, FlowConfigurationRepository
 from core.models.models import TaskConfiguration, TaskDependency
 from .task_type_service import TaskTypeService
 import yaml
@@ -9,6 +9,7 @@ class TaskService:
     def __init__(self):
         self.task_repo = TaskConfigurationRepository()
         self.dependency_repo = TaskDependencyRepository()
+        self.flow_repo = FlowConfigurationRepository()
         self.task_type_service = TaskTypeService()
 
     @classmethod
@@ -86,6 +87,16 @@ class TaskService:
         """Get all tasks for a flow configuration."""
         service = cls()
         tasks = service.task_repo.get_task_configs_by_flow_config(flow_config_id)
+        return [service._task_to_dict(task) for task in tasks]
+
+    @classmethod
+    def get_tasks_by_flow_id(cls, flow_id: str) -> List[Dict[str, Any]]:
+        """Get all tasks for a flow by its flow_id."""
+        service = cls()
+        flow = service.flow_repo.get_flow_config_by_flow_id(flow_id)
+        if not flow:
+            return []
+        tasks = service.task_repo.get_task_configs_by_flow_config(flow.config_id)
         return [service._task_to_dict(task) for task in tasks]
 
     @classmethod
