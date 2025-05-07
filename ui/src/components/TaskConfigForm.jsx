@@ -1,157 +1,223 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   TextField,
   Button,
   Typography,
-  IconButton,
+  Paper,
+  Grid,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Paper,
+  FormHelperText,
+  Tooltip,
+  IconButton,
+  CircularProgress,
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import { Info as InfoIcon } from '@mui/icons-material';
+import { useTaskTypeStore } from '../stores/taskTypeStore';
 
-const TaskConfigForm = ({ node, taskTypes, onUpdate, onClose }) => {
-  const [taskData, setTaskData] = useState({
-    label: node.data.label,
-    type: node.data.type,
-    config: node.data.config,
-  });
+const TaskConfigForm = ({ taskConfig, onSave, onCancel }) => {
+  const { taskTypes, loading, error, fetchTaskTypes } = useTaskTypeStore();
+  const [formData, setFormData] = useState({});
+  const [errors, setErrors] = useState({});
+  const [taskType, setTaskType] = useState(null);
 
-  const handleChange = (field, value) => {
-    setTaskData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const handleConfigChange = (field, value) => {
-    setTaskData((prev) => ({
-      ...prev,
-      config: {
-        ...prev.config,
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleSubmit = () => {
-    onUpdate({
-      ...node,
-      data: {
-        ...node.data,
-        ...taskData,
-      },
+  useEffect(() => {
+    // Fetch task types when component mounts
+    fetchTaskTypes().catch(err => {
+      console.error('Error fetching task types:', err);
     });
-  };
+  }, [fetchTaskTypes]);
 
-  const renderConfigFields = () => {
-    const taskType = taskTypes[taskData.type];
-    if (!taskType) return null;
-
-    const configFields = Object.entries(taskType.defaultConfig);
+  useEffect(() => {
+    console.log('TaskConfig:', taskConfig);
+    console.log('TaskTypes:', taskTypes);
     
-    return configFields.map(([field, defaultValue]) => {
-      if (Array.isArray(defaultValue)) {
-        return (
-          <TextField
-            key={field}
-            fullWidth
-            label={field}
-            value={taskData.config[field]?.join(', ') || ''}
-            onChange={(e) => handleConfigChange(field, e.target.value.split(',').map(s => s.trim()))}
-            margin="normal"
-            helperText={`Enter ${field} separated by commas`}
-          />
-        );
-      }
+    if (taskConfig && taskTypes) {
+      const foundTaskType = taskTypes.find(t => t.type_key === taskConfig.type_key);
+      console.log('Found TaskType:', foundTaskType);
       
-      if (typeof defaultValue === 'object') {
-        return (
-          <TextField
-            key={field}
-            fullWidth
-            label={field}
-            value={JSON.stringify(taskData.config[field] || defaultValue)}
-            onChange={(e) => {
-              try {
-                handleConfigChange(field, JSON.parse(e.target.value));
-              } catch (error) {
-                // Handle invalid JSON
-              }
-            }}
-            margin="normal"
-            multiline
-            rows={4}
-            helperText={`Enter ${field} as JSON`}
-          />
-        );
-      }
+      setFormData(taskConfig.config || {});
+      setTaskType(foundTaskType);
+    }
+  }, [taskConfig, taskTypes]);
 
-      return (
-        <TextField
-          key={field}
-          fullWidth
-          label={field}
-          value={taskData.config[field] || ''}
-          onChange={(e) => handleConfigChange(field, e.target.value)}
-          margin="normal"
-        />
-      );
-    });
+  const handleChange = (field) => (event) => {
+    const value = event.target.value;
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    validateField(field, value);
   };
+
+  const validateField = (field, value) => {
+    if (!taskType?.config_schema) return;
+
+    const schema = taskType.config_schema;
+    const fieldSchema = schema.properties[field];
+    const isRequired = schema.required?.includes(field);
+
+    let error = '';
+    if (isRequired && !value) {
+      error = 'This field is required';
+    } else if (fieldSchema) {
+      if (fieldSchema.type === 'string' && fieldSchema.minLength && value.length < fieldSchema.minLength) {
+        error = `Minimum length is ${fieldSchema.minLength}`;
+      } else if (fieldSchema.type === 'number' && fieldSchema.minimum && value < fieldSchema.minimum) {
+        error = `Minimum value is ${fieldSchema.minimum}`;
+      } else if (fieldSchema.type === 'number' && fieldSchema.maximum && value > fieldSchema.maximum) {
+        error = `Maximum value is ${fieldSchema.maximum}`;
+      }
+    }
+
+    setErrors(prev => ({
+      ...prev,
+      [field]: error
+    }));
+  };
+
+  const validateForm = () => {
+    if (!taskType?.config_schema) return true;
+
+    const schema = taskType.config_schema;
+    const newErrors = {};
+
+    // Check required fields
+    schema.required?.forEach(field => {
+      if (!formData[field]) {
+        newErrors[field] = 'This field is required';
+      }
+    });
+
+    // Validate each field
+    Object.keys(schema.properties || {}).forEach(field => {
+      validateField(field, formData[field]);
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (validateForm()) {
+      onSave({
+        type_key: taskConfig.type_key,
+        config: formData
+      });
+    }
+  };
+
+  const renderField = (field, schema) => {
+    const value = formData[field] || '';
+    const error = errors[field];
+    const isRequired = schema.required?.includes(field);
+
+    return (
+      <Grid item xs={12} key={field}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+          <TextField
+            fullWidth
+            label={`${schema.title || field}${isRequired ? ' *' : ''}`}
+            value={value}
+            onChange={handleChange(field)}
+            error={!!error}
+            helperText={error || schema.description}
+            required={isRequired}
+            multiline={schema.type === 'string' && schema.format === 'multiline'}
+            rows={schema.type === 'string' && schema.format === 'multiline' ? 4 : 1}
+            type={schema.type === 'number' ? 'number' : 'text'}
+          />
+          {schema.description && (
+            <Tooltip title={schema.description} arrow placement="top">
+              <IconButton size="small" sx={{ mt: 1 }}>
+                <InfoIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+      </Grid>
+    );
+  };
+
+  if (loading) {
+    return (
+      <Paper sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress />
+      </Paper>
+    );
+  }
+
+  if (error) {
+    return (
+      <Paper sx={{ p: 3 }}>
+        <Typography color="error">Error loading task types: {error}</Typography>
+      </Paper>
+    );
+  }
+
+  if (!taskTypes || taskTypes.length === 0) {
+    return (
+      <Paper sx={{ p: 3 }}>
+        <Typography>No task types available</Typography>
+      </Paper>
+    );
+  }
+
+  if (!taskConfig) {
+    return (
+      <Paper sx={{ p: 3 }}>
+        <Typography>No task selected</Typography>
+      </Paper>
+    );
+  }
+
+  if (!taskType) {
+    return (
+      <Paper sx={{ p: 3 }}>
+        <Typography>Loading task configuration...</Typography>
+      </Paper>
+    );
+  }
 
   return (
-    <Paper elevation={3} sx={{ p: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6">Task Configuration</Typography>
-        <IconButton onClick={onClose}>
-          <CloseIcon />
-        </IconButton>
-      </Box>
+    <Paper sx={{ p: 3 }}>
+      <form onSubmit={handleSubmit}>
+        <Grid container spacing={2}>
+          <Grid item xs={12}>
+            <Typography variant="h6" gutterBottom>
+              {taskType.name} Configuration
+            </Typography>
+            {taskType.description && (
+              <Typography variant="body2" color="text.secondary" paragraph>
+                {taskType.description}
+              </Typography>
+            )}
+          </Grid>
 
-      <TextField
-        fullWidth
-        label="Task Label"
-        value={taskData.label}
-        onChange={(e) => handleChange('label', e.target.value)}
-        margin="normal"
-      />
+          {taskType.config_schema?.properties && 
+            Object.entries(taskType.config_schema.properties).map(([field, schema]) => 
+              renderField(field, schema)
+            )
+          }
 
-      <FormControl fullWidth margin="normal">
-        <InputLabel>Task Type</InputLabel>
-        <Select
-          value={taskData.type}
-          label="Task Type"
-          onChange={(e) => handleChange('type', e.target.value)}
-        >
-          {Object.entries(taskTypes).map(([type, config]) => (
-            <MenuItem key={type} value={type}>
-              {config.name}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-
-      {renderConfigFields()}
-
-      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button
-          variant="contained"
-          onClick={handleSubmit}
-          sx={{ mr: 1 }}
-        >
-          Update
-        </Button>
-        <Button
-          variant="outlined"
-          onClick={onClose}
-        >
-          Cancel
-        </Button>
-      </Box>
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+              <Button onClick={onCancel}>Cancel</Button>
+              <Button 
+                type="submit" 
+                variant="contained" 
+                color="primary"
+              >
+                Save
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </form>
     </Paper>
   );
 };

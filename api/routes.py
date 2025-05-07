@@ -4,6 +4,7 @@ from .services.task_service import TaskService
 from .services.execution_service import ExecutionService
 from .services.task_type_service import TaskTypeService
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +160,31 @@ def delete_dependency(dependency_id):
     if TaskService.delete_dependency(dependency_id):
         return '', 204
     return jsonify({'error': 'Dependency not found'}), 404
+
+@task_bp.route('/types/refresh', methods=['POST'])
+def refresh_task_types():
+    """Refresh task types from operator factories"""
+    try:
+        from orchestration.airflow_plugin.plugin_core.dag_builder.registry import (
+            discover_factories_from_directory,
+            refresh_task_types
+        )
+        from core.repositories import TaskTypeRepository
+        
+        # Get the plugins directory path
+        plugins_dir = os.path.join(os.path.dirname(__file__), '..', 'orchestration', 'airflow_plugin', 'plugins')
+        
+        # Discover factories
+        factories = discover_factories_from_directory(plugins_dir)
+        
+        # Refresh task types
+        task_type_repository = TaskTypeRepository()
+        refresh_task_types(factories, task_type_repository)
+        
+        return jsonify({'message': 'Task types refreshed successfully'})
+    except Exception as e:
+        logger.error(f"Error refreshing task types: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 # Execution Routes
 @execution_bp.route('/<flow_id>', methods=['POST'])

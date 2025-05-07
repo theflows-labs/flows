@@ -7,7 +7,7 @@ from typing import Optional
 # Database connection settings
 DB_USER = os.getenv('POSTGRES_USER', 'flows')
 DB_PASSWORD = os.getenv('POSTGRES_PASSWORD', 'flows123')
-DB_HOST = os.getenv('POSTGRES_HOST', 'localhost')
+DB_HOST = os.getenv('POSTGRES_HOST', 'localhost') # 'postgres' for docker
 DB_PORT = os.getenv('POSTGRES_PORT', '5432')
 DB_NAME = os.getenv('POSTGRES_DB', 'flows_db')
 

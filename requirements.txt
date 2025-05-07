@@ -5,6 +5,7 @@ SQLAlchemy==1.4.51
 Flask==2.2.5
 Flask-CORS==4.0.0
 Werkzeug==2.2.3
+pydantic==2.10.2
 
 # AWS
 boto3==1.34.69
