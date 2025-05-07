@@ -59,7 +59,15 @@ const FlowBuilder = () => {
           const flowData = await response.json();
           setSelectedFlow(flowData);
           if (flowData.config_details) {
-            setNodes(flowData.config_details.nodes || []);
+            // Ensure nodes have task IDs
+            const nodesWithTaskIds = flowData.config_details.nodes.map(node => ({
+              ...node,
+              data: {
+                ...node.data,
+                task_id: node.data.task_id // Preserve task_id if it exists
+              }
+            }));
+            setNodes(nodesWithTaskIds);
             setEdges(flowData.config_details.edges || []);
           }
         } catch (error) {
@@ -121,6 +129,7 @@ const FlowBuilder = () => {
         label: `New ${taskType.name}`,
         type: typeKey,
         config: taskType.defaultConfig || {},
+        task_id: null // Initialize task_id as null for new nodes
       },
     };
     setNodes((nds) => [...nds, newNode]);

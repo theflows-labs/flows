@@ -240,13 +240,13 @@ const TaskTypeManagement = () => {
           >
             Refresh Task Types
           </Button>
-          <Button 
+          {/* <Button 
             startIcon={<AddIcon />} 
             variant="contained" 
             onClick={handleCreate}
           >
             Add Task Type
-          </Button>
+          </Button> */}
         </Box>
       </Box>
 
