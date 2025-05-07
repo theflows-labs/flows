@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 import logging
 from datetime import datetime, timedelta
 import json
+from dataclasses import dataclass, field
+from pydantic import BaseModel, Field
 
 from airflow import DAG
 from airflow.models import BaseOperator
@@ -16,10 +18,36 @@ from core.models import FlowConfiguration, TaskConfiguration, TaskDependency
 
 logger = logging.getLogger(__name__)
 
+class OperatorParams(BaseModel):
+    """Base class for operator parameters using Pydantic for validation."""
+    task_id: str = Field(..., description="Task ID")
+    class Config:
+        arbitrary_types_allowed = True
+
+    @classmethod
+    def get_parameter_documentation(cls) -> Dict[str, Dict[str, Any]]:
+        """Get complete documentation for all parameters."""
+        schema = cls.schema()
+        properties = schema.get('properties', {})
+        required = schema.get('required', [])
+        
+        documentation = {}
+        for param_name, param_info in properties.items():
+            documentation[param_name] = {
+                "required": param_name in required,
+                "type": param_info.get('type', 'string'),
+                "default": param_info.get('default'),
+                "description": param_info.get('description', ''),
+                "example": param_info.get('example')
+            }
+        return documentation
+
 class OperatorFactory(ABC):
     """
     Abstract base class for operator factories.
     """
+    TASK_TYPE = "base"
+    params_class = OperatorParams
     
     @classmethod
     @abstractmethod
@@ -33,7 +61,7 @@ class OperatorFactory(ABC):
         Returns:
             The operator class
         """
-        pass
+        raise NotImplementedError("Subclasses must implement get_operator_class")
     
     @abstractmethod
     def create_operator(self, task_config: TaskConfiguration, dag: DAG) -> BaseOperator:
@@ -50,100 +78,14 @@ class OperatorFactory(ABC):
         pass
     
     @classmethod
-    def get_required_parameters(cls) -> List[str]:
-        """
-        Get the list of required parameters for this operator.
-        
-        Returns:
-            A list of required parameter names
-        """
-        return []
-    
-    @classmethod
-    def get_optional_parameters(cls) -> Dict[str, Any]:
-        """
-        Get the optional parameters and their default values for this operator.
-        
-        Returns:
-            A dictionary of optional parameter names and their default values
-        """
-        return {}
-    
-    @classmethod
-    def get_parameter_descriptions(cls) -> Dict[str, str]:
-        """
-        Get descriptions for all parameters of this operator.
-        
-        Returns:
-            A dictionary of parameter names and their descriptions
-        """
-        return {}
-    
-    @classmethod
-    def get_parameter_types(cls) -> Dict[str, Type]:
-        """
-        Get the types of all parameters for this operator.
-        
-        Returns:
-            A dictionary of parameter names and their types
-        """
-        return {}
-    
-    @classmethod
-    def get_parameter_examples(cls) -> Dict[str, Any]:
-        """
-        Get example values for all parameters of this operator.
-        
-        Returns:
-            A dictionary of parameter names and example values
-        """
-        return {}
-    
-    @classmethod
     def get_parameter_documentation(cls) -> Dict[str, Dict[str, Any]]:
         """
         Get complete documentation for all parameters of this operator.
         
         Returns:
-            A dictionary containing complete parameter documentation:
-            {
-                "param_name": {
-                    "required": bool,
-                    "type": Type,
-                    "default": Any,
-                    "description": str,
-                    "example": Any
-                }
-            }
+            A dictionary containing complete parameter documentation
         """
-        required_params = cls.get_required_parameters()
-        optional_params = cls.get_optional_parameters()
-        descriptions = cls.get_parameter_descriptions()
-        types = cls.get_parameter_types()
-        examples = cls.get_parameter_examples()
-        
-        documentation = {}
-        
-        # Add required parameters
-        for param in required_params:
-            documentation[param] = {
-                "required": True,
-                "type": types.get(param, str),
-                "description": descriptions.get(param, ""),
-                "example": examples.get(param, None)
-            }
-        
-        # Add optional parameters
-        for param, default in optional_params.items():
-            documentation[param] = {
-                "required": False,
-                "type": types.get(param, str),
-                "default": default,
-                "description": descriptions.get(param, ""),
-                "example": examples.get(param, None)
-            }
-        
-        return documentation
+        return cls.params_class.get_parameter_documentation()
     
     def _parse_config_details(self, config_details: Any) -> Dict[str, Any]:
         """
@@ -166,53 +108,93 @@ class OperatorFactory(ABC):
         else:
             raise ValueError(f"Invalid configuration details type: {type(config_details)}")
     
-    def _validate_parameters(self, config_details: Dict[str, Any]) -> None:
+    def _validate_and_parse_params(self, config_details: Dict[str, Any]) -> OperatorParams:
         """
-        Validate that all required parameters are present and have correct types.
+        Validate and parse configuration details into operator parameters.
         
         Args:
             config_details: The configuration details to validate
             
+        Returns:
+            An instance of the operator's params class
+            
         Raises:
             ValueError: If validation fails
         """
-        required_params = self.get_required_parameters()
-        param_types = self.get_parameter_types()
-        
-        # Check required parameters
-        for param in required_params:
-            if param not in config_details:
-                raise ValueError(f"Missing required parameter: {param}")
-            
-            # Check parameter type if specified
-            if param in param_types:
-                expected_type = param_types[param]
-                actual_value = config_details[param]
-                if not isinstance(actual_value, expected_type):
-                    raise ValueError(
-                        f"Parameter {param} must be of type {expected_type.__name__}, "
-                        f"got {type(actual_value).__name__}"
-                    )
+        try:
+            return self.params_class(**config_details)
+        except Exception as e:
+            logger.error(f"Error validating parameters: {str(e)}")
+            raise ValueError(f"Invalid parameters: {str(e)}")
     
-    def _apply_defaults(self, config_details: Dict[str, Any]) -> Dict[str, Any]:
+    def _create_operator(self, task_config: TaskConfiguration, dag: DAG, **kwargs) -> BaseOperator:
         """
-        Apply default values for optional parameters.
+        Create an operator instance with validated parameters.
         
         Args:
-            config_details: The configuration details
+            task_config: The task configuration
+            dag: The DAG instance
+            **kwargs: Additional arguments for the operator
             
         Returns:
-            Updated configuration details with defaults applied
+            An operator instance
         """
-        optional_params = self.get_optional_parameters()
-        result = config_details.copy()
+        config_details = self._parse_config_details(task_config.config_details)
+        params = self._validate_and_parse_params(config_details)
         
-        for param, default in optional_params.items():
-            if param not in result:
-                result[param] = default
-        
-        return result
+        operator_class = self.get_operator_class(task_config.task_type)
+        return operator_class(
+            task_id=task_config.task_id,
+            dag=dag,
+            **params.dict(),
+            **kwargs
+        )
 
+    @classmethod
+    def get_config_schema(cls) -> Dict[str, Any]:
+        """Get the configuration schema for the task type"""
+        # Get the schema from the Pydantic model
+        schema = cls.params_class.schema()
+        
+        # Remove task_id from schema as it's handled separately
+        if 'properties' in schema:
+            schema['properties'].pop('task_id', None)
+        if 'required' in schema:
+            schema['required'] = [f for f in schema['required'] if f != 'task_id']
+            
+        # Add title and description from class docstring
+        schema['title'] = cls.__name__.replace('Factory', '')
+        schema['description'] = cls.__doc__ or ''
+        
+        # Ensure proper JSON Schema format
+        schema['type'] = 'object'
+        if 'properties' not in schema:
+            schema['properties'] = {}
+            
+        return schema
+
+    @classmethod
+    def get_default_config(cls) -> Dict[str, Any]:
+        """Get the default configuration values for the task type"""
+        # Create an instance with default values, excluding task_id
+        schema = cls.params_class.schema()
+        properties = schema.get('properties', {})
+        required = schema.get('required', [])
+        
+        # Build default config with only non-required fields
+        default_config = {}
+        for field_name, field_info in properties.items():
+            if field_name != 'task_id':  # Skip task_id as it's handled separately
+                if field_name not in required:
+                    default_value = field_info.get('default')
+                    if default_value is not None:
+                        default_config[field_name] = default_value
+                    elif field_info.get('type') == 'object':
+                        default_config[field_name] = {}
+                    elif field_info.get('type') == 'array':
+                        default_config[field_name] = []
+        
+        return default_config
 
 class BaseDAGBuilder(ABC):
     """Abstract base class for DAG builders."""

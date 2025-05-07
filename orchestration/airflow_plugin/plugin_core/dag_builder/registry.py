@@ -10,6 +10,7 @@ import os
 import sys
 
 from orchestration.airflow_plugin.plugin_core.dag_builder.base import OperatorFactory
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +172,9 @@ class OperatorRegistry:
                             for name, obj in inspect.getmembers(module):
                                 if (inspect.isclass(obj) and 
                                     issubclass(obj, OperatorFactory) and 
-                                    obj != OperatorFactory):
+                                    obj != OperatorFactory and
+                                    not obj.__name__.startswith('Base') and  # Skip base classes
+                                    obj.TASK_TYPE != "base"):  # Skip base task type
                                     
                                     task_type = getattr(obj, 'TASK_TYPE', None)
                                     if task_type:
@@ -288,7 +291,9 @@ class OperatorRegistry:
         for _, obj in inspect.getmembers(module):
             if (inspect.isclass(obj) and 
                 issubclass(obj, OperatorFactory) and 
-                obj != OperatorFactory):
+                obj != OperatorFactory and
+                not obj.__name__.startswith('Base') and  # Skip base classes
+                obj.TASK_TYPE != "base"):  # Skip base task type
                 
                 # Get task type from class
                 task_type = getattr(obj, 'TASK_TYPE', None)
@@ -305,4 +310,80 @@ class OperatorRegistry:
         Returns:
             A list of task type identifiers
         """
-        return list(self._factories.keys()) 
+        return list(self._factories.keys())
+
+def discover_factories_from_directory(directory_path: str) -> Dict[str, Type[OperatorFactory]]:
+    """
+    Discover operator factories from a directory.
+    
+    Args:
+        directory_path: Path to the directory containing operator factory modules
+        
+    Returns:
+        Dictionary mapping task types to their factory classes
+    """
+    factories = {}
+    
+    # Walk through the directory
+    for root, _, files in os.walk(directory_path):
+        for file in files:
+            if file.endswith('_operator.py'):
+                # Convert file path to module path
+                rel_path = os.path.relpath(os.path.join(root, file), directory_path)
+                module_path = rel_path.replace(os.sep, '.').replace('.py', '')
+                
+                try:
+                    # Import the module
+                    module = importlib.import_module(module_path)
+                    
+                    # Find all OperatorFactory subclasses in the module
+                    for name, obj in inspect.getmembers(module):
+                        if (inspect.isclass(obj) and 
+                            issubclass(obj, OperatorFactory) and 
+                            obj != OperatorFactory and
+                            not obj.__name__.startswith('Base') and  # Skip base classes
+                            obj.TASK_TYPE != "base"):  # Skip base task type
+                            factories[obj.TASK_TYPE] = obj
+                            
+                except Exception as e:
+                    print(f"Error loading module {module_path}: {str(e)}")
+                    continue
+    
+    return factories
+
+def refresh_task_types(factories: Dict[str, Type[OperatorFactory]], task_type_repository) -> None:
+    """
+    Refresh task types in the database using factory configurations.
+    
+    Args:
+        factories: Dictionary of task types to their factory classes
+        task_type_repository: Repository for managing task types
+    """
+    for task_type, factory_class in factories.items():
+        try:
+            # Get schema and default config from factory
+            if hasattr(factory_class, 'params_class') and issubclass(factory_class.params_class, BaseModel):
+                config_schema = factory_class.get_config_schema()
+                default_config = factory_class.get_default_config()
+            else:
+                # If params_class is not a Pydantic model, use a basic schema
+                config_schema = {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+                default_config = {}
+            
+            # Create or update task type
+            task_type_repository.create_or_update_task_type(
+                type_key=task_type,
+                name=factory_class.__name__.replace('Factory', ''),
+                description=getattr(factory_class, '__doc__', ''),
+                config_schema=config_schema,
+                default_config=default_config,
+                icon=factory_class().get_icon()
+            )
+            
+        except Exception as e:
+            print(f"Error refreshing task type {task_type}: {str(e)}")
+            continue 

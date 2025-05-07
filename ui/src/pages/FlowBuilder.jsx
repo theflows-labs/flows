@@ -72,7 +72,7 @@ const FlowBuilder = () => {
     // Fetch task types when component mounts
     const fetchTaskTypes = async () => {
       try {
-        const response = await fetch('/api/tasks/types');
+        const response = await fetch('/api/task-types');
         if (!response.ok) throw new Error('Failed to fetch task types');
         const types = await response.json();
         
@@ -91,7 +91,7 @@ const FlowBuilder = () => {
         setTaskTypes(typeMap);
       } catch (error) {
         console.error('Error fetching task types:', error);
-        // Handle error (show notification, etc.)
+        showNotification('Error loading task types', 'error');
       }
     };
 
@@ -257,16 +257,27 @@ const FlowBuilder = () => {
         {selectedNode && (
           <Box sx={{ width: 300, p: 2, borderLeft: 1, borderColor: 'divider' }}>
             <TaskConfigForm
-              node={selectedNode}
-              taskTypes={taskTypes}
-              onUpdate={(updatedNode) => {
+              taskConfig={{
+                type_key: selectedNode.data.type,
+                config: selectedNode.data.config || {}
+              }}
+              onSave={(updatedConfig) => {
                 setNodes((nds) =>
                   nds.map((node) =>
-                    node.id === updatedNode.id ? updatedNode : node
+                    node.id === selectedNode.id 
+                      ? {
+                          ...node,
+                          data: {
+                            ...node.data,
+                            config: updatedConfig.config
+                          }
+                        }
+                      : node
                   )
                 );
+                setSelectedNode(null);
               }}
-              onClose={() => setSelectedNode(null)}
+              onCancel={() => setSelectedNode(null)}
             />
           </Box>
         )}
