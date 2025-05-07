@@ -161,6 +161,11 @@ def delete_dependency(dependency_id):
         return '', 204
     return jsonify({'error': 'Dependency not found'}), 404
 
+@task_bp.route('/dependencies/flow/<int:flow_config_id>', methods=['GET'])
+def get_dependencies_by_flow(flow_config_id):
+    dependencies = TaskService.get_dependencies_by_flow(flow_config_id)
+    return jsonify(dependencies)
+
 @task_bp.route('/types/refresh', methods=['POST'])
 def refresh_task_types():
     """Refresh task types from operator factories"""

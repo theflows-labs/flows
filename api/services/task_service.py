@@ -90,6 +90,13 @@ class TaskService:
         return [service._task_to_dict(task) for task in tasks]
 
     @classmethod
+    def get_dependencies_by_flow(cls, flow_config_id: int) -> List[Dict[str, Any]]:
+        """Get all dependencies for a flow configuration."""
+        service = cls()
+        dependencies = service.dependency_repo.get_dependencies_by_flow(flow_config_id)
+        return [service._dependency_to_dict(dep) for dep in dependencies]
+
+    @classmethod
     def get_tasks_by_flow_id(cls, flow_id: str) -> List[Dict[str, Any]]:
         """Get all tasks for a flow by its flow_id."""
         service = cls()
