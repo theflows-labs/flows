@@ -9,6 +9,7 @@ from datetime import datetime
 from enum import Enum
 from sqlalchemy import and_
 from sqlalchemy.orm import joinedload
+import yaml
 
 from config.database import SQLALCHEMY_CONN
 
@@ -133,11 +134,15 @@ class TaskConfigurationRepository:
         """Create a new task configuration."""
         session = self.Session()
         try:
+            # Generate YAML if not provided
+            if config_details_yaml is None and config_details:
+                config_details_yaml = yaml.dump(config_details, default_flow_style=False)
+
             task_config = TaskConfiguration(
                 flow_config_id=flow_config_id,
                 task_type=task_type,
                 task_sequence=task_sequence,
-                config_details=config_details,
+                config_details=config_details,  # Store as JSON directly
                 config_details_yaml=config_details_yaml,
                 description=description,
                 is_active=True
@@ -198,16 +203,20 @@ class TaskConfigurationRepository:
             return tasks
 
     def update_task_config(self, task_id: int, config_details: Optional[Dict[str, Any]] = None, 
-                         description: Optional[str] = None, is_active: Optional[bool] = None) -> Optional[TaskConfiguration]:
+                         description: Optional[str] = None, is_active: Optional[bool] = None,
+                         config_details_yaml: Optional[str] = None) -> Optional[TaskConfiguration]:
         """Update a task configuration."""
         session = self.Session()
         try:
             task_config = session.query(TaskConfiguration).filter(TaskConfiguration.task_id == task_id).first()
             if task_config:
                 if config_details is not None:
-                    # Convert dictionary to JSON string
-                    config_json = json.dumps(config_details, default=self._json_serializer)
-                    task_config.config_details = config_json
+                    # Store config_details directly as JSON
+                    task_config.config_details = config_details
+                    # Generate YAML if not provided
+                    if config_details_yaml is None:
+                        config_details_yaml = yaml.dump(config_details, default_flow_style=False)
+                    task_config.config_details_yaml = config_details_yaml
                 if description is not None:
                     task_config.description = description
                 if is_active is not None:

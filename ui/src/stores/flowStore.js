@@ -26,119 +26,120 @@ const useFlowStore = create((set) => ({
   },
 
   saveFlow: async (flowData) => {
-    set({ loading: true, error: null });
     try {
-      // Convert flow configuration to YAML
+      // Generate YAML content
       const yamlContent = generateFlowYAML(flowData);
-      
-      // Prepare the request body
-      const requestBody = {
-        flow_id: flowData.flow_id,
-        description: flowData.description,
-        config_details: flowData.config_details,
-        config_details_yaml: yamlContent
-      };
 
-      // Save flow configuration
-      const response = await fetch('/api/flows', {
+      // First, save the flow configuration
+      const flowConfigResponse = await fetch('/api/flows', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const savedFlow = await response.json();
-
-      // Save tasks and get ID mapping
-      let taskIdMapping;
-      if (flowData.config_details?.nodes) {
-        taskIdMapping = await saveTasks(savedFlow.config_id, flowData.config_details.nodes);
-      }
-
-      // Save dependencies using the ID mapping
-      if (flowData.config_details?.edges && taskIdMapping) {
-        await saveDependencies(savedFlow.config_id, flowData.config_details.edges, taskIdMapping);
-      }
-
-      set((state) => ({
-        flows: [...state.flows, savedFlow],
-        loading: false,
-      }));
-      return savedFlow;
-    } catch (error) {
-      console.error('Error saving flow:', error);
-      set({ error: error.message, loading: false });
-      throw error;
-    }
-  },
-
-  updateFlow: async (flowId, flowData) => {
-    set({ loading: true, error: null });
-    try {
-      // First, fetch existing tasks to get current task IDs
-      const tasksResponse = await fetch(`/api/tasks/flow/${flowId}`);
-      const existingTasks = await tasksResponse.json();
-      
-      // Create a mapping of existing task positions/names to their IDs
-      const existingTaskMapping = new Map(
-        existingTasks.map(task => [
-          // You might need to adjust this mapping logic based on how you identify tasks
-          `${task.task_type}-${task.task_sequence}`,
-          task.task_id
-        ])
-      );
-
-      // Convert flow configuration to YAML
-      const yamlContent = generateFlowYAML(flowData);
-
-      // Update flow configuration
-      const response = await fetch(`/api/flows/${flowId}`, {
-        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           flow_id: flowData.flow_id,
           description: flowData.description,
-          config_details: flowData.config_details,
           config_details_yaml: yamlContent
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      if (!flowConfigResponse.ok) {
+        throw new Error('Failed to save flow configuration');
       }
 
-      const updatedFlow = await response.json();
+      const flowConfig = await flowConfigResponse.json();
 
-      // Save/update tasks and get new ID mapping
-      let taskIdMapping;
-      if (flowData.config_details?.nodes) {
-        taskIdMapping = await saveTasks(updatedFlow.config_id, flowData.config_details.nodes);
-      }
+      // Save tasks and get ID mapping
+      const taskIdMapping = await saveTasks(flowConfig.config_id, flowData.config_details.nodes);
 
-      // Save/update dependencies using the ID mapping
-      if (flowData.config_details?.edges && taskIdMapping) {
-        await saveDependencies(updatedFlow.config_id, flowData.config_details.edges, taskIdMapping);
-      }
-
-      set((state) => ({
-        flows: state.flows.map((flow) =>
-          flow.flow_id === flowId ? updatedFlow : flow
-        ),
-        loading: false,
+      // Update nodes with task IDs
+      const updatedNodes = flowData.config_details.nodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          task_id: taskIdMapping.get(node.id)
+        }
       }));
-      return updatedFlow;
+
+      // Update flow configuration with task IDs
+      const updatedFlowConfig = {
+        ...flowConfig,
+        config_details: {
+          nodes: updatedNodes,
+          edges: flowData.config_details.edges,
+        },
+        config_details_yaml: yamlContent
+      };
+
+      // Update the flow configuration with task IDs
+      const updateResponse = await fetch(`/api/flows/${flowConfig.flow_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedFlowConfig),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update flow configuration');
+      }
+
+      return await updateResponse.json();
+    } catch (error) {
+      console.error('Error saving flow:', error);
+      throw error;
+    }
+  },
+
+  updateFlow: async (flowId, flowData) => {
+    try {
+      // Generate YAML content
+      const yamlContent = generateFlowYAML(flowData);
+
+      // Get existing flow configuration
+      const existingFlowResponse = await fetch(`/api/flows/${flowId}`);
+      if (!existingFlowResponse.ok) {
+        throw new Error('Failed to get existing flow configuration');
+      }
+      const existingFlow = await existingFlowResponse.json();
+
+      // Save tasks and get ID mapping
+      const taskIdMapping = await saveTasks(existingFlow.config_id, flowData.config_details.nodes);
+
+      // Update nodes with task IDs
+      const updatedNodes = flowData.config_details.nodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          task_id: taskIdMapping.get(node.id)
+        }
+      }));
+
+      // Update flow configuration with task IDs
+      const updatedFlowConfig = {
+        ...flowData,
+        config_details: {
+          nodes: updatedNodes,
+          edges: flowData.config_details.edges,
+        },
+        config_details_yaml: yamlContent
+      };
+
+      const response = await fetch(`/api/flows/${flowId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedFlowConfig),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update flow');
+      }
+
+      return await response.json();
     } catch (error) {
       console.error('Error updating flow:', error);
-      set({ error: error.message, loading: false });
       throw error;
     }
   },
@@ -259,26 +260,43 @@ async function saveTasks(flowConfigId, nodes) {
       task_type: node.data.type,
       task_sequence: node.data.sequence || 0,
       config_details: node.data.config,
-      config_details_yaml: yaml.dump(node.data.config),
       description: node.data.description || node.data.label
     };
 
     try {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(taskData),
-      });
+      // If node has a task_id, update existing task
+      if (node.data.task_id) {
+        const response = await fetch(`/api/tasks/${node.data.task_id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(taskData),
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to save task: ${node.id}`);
+        if (!response.ok) {
+          throw new Error(`Failed to update task: ${node.id}`);
+        }
+
+        const updatedTask = await response.json();
+        taskIdMapping.set(node.id, updatedTask.task_id);
+      } else {
+        // Create new task
+        const response = await fetch('/api/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(taskData),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to save task: ${node.id}`);
+        }
+
+        const savedTask = await response.json();
+        taskIdMapping.set(node.id, savedTask.task_id);
       }
-
-      const savedTask = await response.json();
-      // Store the mapping between React Flow node ID and actual task ID
-      taskIdMapping.set(node.id, savedTask.task_id);
     } catch (error) {
       console.error('Error saving task:', error);
       throw error;
