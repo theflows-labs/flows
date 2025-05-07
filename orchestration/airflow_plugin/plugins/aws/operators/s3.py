@@ -1,240 +1,53 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, Type
+from pydantic import Field
+from airflow.models import BaseOperator
+from airflow import DAG
 from airflow.providers.amazon.aws.operators.s3 import (
-    S3ListOperator,
-    S3DeleteObjectsOperator,
     S3CopyObjectOperator,
-    S3CreateObjectOperator
+    S3DeleteObjectsOperator,
+    S3CreateObjectOperator,
+    S3ListOperator
 )
-#from airflow.providers.amazon.aws.transfers.s3_to_s3 import S3ToS3Operator
-from airflow.providers.amazon.aws.transfers.local_to_s3 import LocalFilesystemToS3Operator
-from .base_aws import BaseAWSOperatorFactory
+from orchestration.airflow_plugin.plugins.aws.operators.base_aws import BaseAWSOperatorFactory, BaseAWSParams
 
-class BaseS3OperatorFactory(BaseAWSOperatorFactory):
-    """Base factory for S3 operators"""
-    
-    TASK_TYPE = "s3"
+class S3CopyOperatorParams(BaseAWSParams):
+    """Parameters for S3 operator."""
+    source_bucket_key: str = Field(..., description="Source S3 key")
+    dest_bucket_key: str = Field(..., description="Destination S3 key")
+    source_bucket_name: str = Field(..., description="Source S3 bucket name")
+    dest_bucket_name: str = Field(..., description="Destination S3 bucket name")
 
-    def get_icon(self) -> str:
-        """Get operator icon"""
-        return "s3"
-
-    def get_config_schema(self) -> Dict[str, Any]:
-        """Get base S3 configuration schema"""
-        base_schema = super().get_config_schema()
-        base_schema["properties"].update({
-            "bucket": {
-                "type": "string",
-                "description": "S3 bucket name"
-            }
-        })
-        return base_schema
-
-    def get_default_config(self) -> Dict[str, Any]:
-        """Get default configuration"""
-        return {
-            "aws_conn_id": "aws_default",
-            "bucket": ""
-        }
-
-class S3ListOperatorFactory(BaseS3OperatorFactory):
-    """Factory for S3 list operation"""
-    
-    TASK_TYPE = "s3_list"
-
-    def get_operator_class(self):
-        """Get the operator class"""
-        return S3ListOperator
-
-    def create_operator(self, task_id: str, config: Dict[str, Any]):
-        """Create S3 list operator"""
-        aws_args = self.get_common_aws_args(config)
-        return S3ListOperator(
-            task_id=task_id,
-            bucket=config['bucket'],
-            prefix=config.get('prefix'),
-            delimiter=config.get('delimiter'),
-            **aws_args
-        )
-
-    def get_config_schema(self) -> Dict[str, Any]:
-        """Get list operation configuration schema"""
-        base_schema = super().get_config_schema()
-        base_schema["properties"].update({
-            "prefix": {
-                "type": "string",
-                "description": "Prefix for list operation"
-            },
-            "delimiter": {
-                "type": "string",
-                "description": "Delimiter for list operation"
-            }
-        })
-        return base_schema
-
-    def get_default_config(self) -> Dict[str, Any]:
-        """Get default configuration"""
-        base_config = super().get_default_config()
-        base_config.update({
-            "prefix": "",
-            "delimiter": ""
-        })
-        return base_config
-
-    def get_required_parameters(self) -> List[str]:
-        """Get required parameters"""
-        return ['bucket']
-
-class S3DeleteOperatorFactory(BaseS3OperatorFactory):
-    """Factory for S3 delete operation"""
-    
-    TASK_TYPE = "s3_delete"
-
-    def get_operator_class(self):
-        """Get the operator class"""
-        return S3DeleteObjectsOperator
-
-    def create_operator(self, task_id: str, config: Dict[str, Any]):
-        """Create S3 delete operator"""
-        aws_args = self.get_common_aws_args(config)
-        return S3DeleteObjectsOperator(
-            task_id=task_id,
-            bucket=config['bucket'],
-            keys=config['keys'],
-            **aws_args
-        )
-
-    def get_config_schema(self) -> Dict[str, Any]:
-        """Get delete operation configuration schema"""
-        base_schema = super().get_config_schema()
-        base_schema["properties"].update({
-            "keys": {
-                "type": "array",
-                "items": {
-                    "type": "string"
-                },
-                "description": "Keys to delete"
-            }
-        })
-        return base_schema
-
-    def get_default_config(self) -> Dict[str, Any]:
-        """Get default configuration"""
-        base_config = super().get_default_config()
-        base_config.update({
-            "keys": []
-        })
-        return base_config
-
-    def get_required_parameters(self) -> List[str]:
-        """Get required parameters"""
-        return ['bucket', 'keys']
-
-class S3CopyOperatorFactory(BaseS3OperatorFactory):
-    """Factory for S3 copy operation"""
+class S3CopyOperatorFactory(BaseAWSOperatorFactory):
+    """Factory for creating S3 operators"""
     
     TASK_TYPE = "s3_copy"
-
-    def get_operator_class(self):
-        """Get the operator class"""
-        return S3CopyObjectOperator
-
-    def create_operator(self, task_id: str, config: Dict[str, Any]):
-        """Create S3 copy operator"""
-        aws_args = self.get_common_aws_args(config)
-        return S3CopyObjectOperator(
-            task_id=task_id,
-            source_bucket_key=config['source_bucket_key'],
-            dest_bucket_key=config['dest_bucket_key'],
-            **aws_args
-        )
-
-    def get_config_schema(self) -> Dict[str, Any]:
-        """Get copy operation configuration schema"""
-        base_schema = super().get_config_schema()
-        base_schema["properties"].update({
-            "source_bucket_key": {
-                "type": "string",
-                "description": "Source bucket and key (format: bucket/key)"
-            },
-            "dest_bucket_key": {
-                "type": "string",
-                "description": "Destination bucket and key (format: bucket/key)"
-            }
-        })
-        return base_schema
-
-    def get_default_config(self) -> Dict[str, Any]:
-        """Get default configuration"""
-        base_config = super().get_default_config()
-        base_config.update({
-            "source_bucket_key": "",
-            "dest_bucket_key": ""
-        })
-        return base_config
-
-    def get_required_parameters(self) -> List[str]:
-        """Get required parameters"""
-        return ['source_bucket_key', 'dest_bucket_key']
-
-class S3CreateOperatorFactory(BaseS3OperatorFactory):
-    """Factory for S3 create operation"""
+    params_class = S3CopyOperatorParams
     
-    TASK_TYPE = "s3_create"
-
-    def get_operator_class(self):
+    @classmethod
+    def get_operator_class(cls, task_type: str) -> Type[BaseOperator]:
         """Get the operator class"""
-        return S3CreateObjectOperator
+        return S3CopyObjectOperator 
+    
+    def create_operator(self, task_id: str, params: S3CopyOperatorParams, dag: DAG) -> BaseOperator:
+        """Create an S3 copy operator from parameters"""
+        return super().create_operator(task_id, params, dag)
+    
 
-    def create_operator(self, task_id: str, config: Dict[str, Any]):
-        """Create S3 create operator"""
-        aws_args = self.get_common_aws_args(config)
-        return S3CreateObjectOperator(
-            task_id=task_id,
-            bucket=config['bucket'],
-            key=config['key'],
-            data=config.get('data', ''),
-            **aws_args
-        )
+class S3ListOperatorParams(BaseAWSParams):
+    """Parameters for S3 operator."""
+    bucket: str = Field(..., description="S3 bucket name")
 
-    def get_config_schema(self) -> Dict[str, Any]:
-        """Get create operation configuration schema"""
-        base_schema = super().get_config_schema()
-        base_schema["properties"].update({
-            "key": {
-                "type": "string",
-                "description": "Object key for create operation"
-            },
-            "data": {
-                "type": "string",
-                "description": "Data to create in the object"
-            }
-        })
-        return base_schema
-
-    def get_default_config(self) -> Dict[str, Any]:
-        """Get default configuration"""
-        base_config = super().get_default_config()
-        base_config.update({
-            "key": "",
-            "data": ""
-        })
-        return base_config
-
-    def get_required_parameters(self) -> List[str]:
-        """Get required parameters"""
-        return ['bucket', 'key']
-
-    def get_icon(self) -> str:
-        """Get operator icon"""
-        return "s3"
-
-    def get_required_parameters(self) -> List[str]:
-        """Get required parameters based on operation type"""
-        operation = self.config.get('operation', 'list')
-        required_params = {
-            'list': ['bucket'],
-            'delete': ['bucket', 'keys'],
-            'copy': ['source_bucket_key', 'dest_bucket_key'],
-            'put': ['bucket', 'key']
-        }
-        return required_params.get(operation, ['bucket']) 
+class S3ListOperatorFactory(BaseAWSOperatorFactory):
+    """Factory for creating S3 operators"""
+    
+    TASK_TYPE = "s3_list"
+    params_class = S3ListOperatorParams
+    
+    @classmethod
+    def get_operator_class(cls, task_type: str) -> Type[BaseOperator]:
+        """Get the operator class"""
+        return S3ListOperator 
+    
+    def create_operator(self, task_id: str, params: S3ListOperatorParams, dag: DAG) -> BaseOperator:
+        """Create an S3 list operator from parameters"""
+        return super().create_operator(task_id, params, dag)

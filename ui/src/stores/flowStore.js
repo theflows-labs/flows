@@ -39,6 +39,7 @@ const useFlowStore = create((set) => ({
         body: JSON.stringify({
           flow_id: flowData.flow_id,
           description: flowData.description,
+          config_details: flowData.config_details,
           config_details_yaml: yamlContent
         }),
       });
@@ -51,6 +52,9 @@ const useFlowStore = create((set) => ({
 
       // Save tasks and get ID mapping
       const taskIdMapping = await saveTasks(flowConfig.config_id, flowData.config_details.nodes);
+
+      // Save dependencies using the ID mapping
+      await saveDependencies(flowConfig.config_id, flowData.config_details.edges, taskIdMapping);
 
       // Update nodes with task IDs
       const updatedNodes = flowData.config_details.nodes.map(node => ({
@@ -105,6 +109,9 @@ const useFlowStore = create((set) => ({
 
       // Save tasks and get ID mapping
       const taskIdMapping = await saveTasks(existingFlow.config_id, flowData.config_details.nodes);
+
+      // Save dependencies using the ID mapping
+      await saveDependencies(existingFlow.config_id, flowData.config_details.edges, taskIdMapping);
 
       // Update nodes with task IDs
       const updatedNodes = flowData.config_details.nodes.map(node => ({

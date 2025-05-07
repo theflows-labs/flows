@@ -23,9 +23,13 @@ class FlowConfigurationRepository:
         """Create a new Flow configuration."""
         session = self.Session()
         try:
+            # Generate YAML if not provided
+            if config_details_yaml is None and config_details:
+                config_details_yaml = yaml.dump(config_details, default_flow_style=False)
+
             flow_config = FlowConfiguration(
                 flow_id=flow_id,
-                config_details=config_details,
+                config_details=config_details,  # Store as JSONB directly
                 config_details_yaml=config_details_yaml,
                 description=description,
                 is_active=True
@@ -65,9 +69,12 @@ class FlowConfigurationRepository:
         try:
             flow_config = session.query(FlowConfiguration).filter(FlowConfiguration.config_id == config_id).first()
             if flow_config:
+                # Store config_details directly as JSONB
                 flow_config.config_details = config_details
-                if config_details_yaml is not None:
-                    flow_config.config_details_yaml = config_details_yaml
+                # Generate YAML if not provided
+                if config_details_yaml is None and config_details:
+                    config_details_yaml = yaml.dump(config_details, default_flow_style=False)
+                flow_config.config_details_yaml = config_details_yaml
                 if description is not None:
                     flow_config.description = description
                 session.commit()

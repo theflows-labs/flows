@@ -1,40 +1,52 @@
 version: '1.0'
 flow:
-  id: testr2
-  description: this is test 2
+  id: test1
+  description: First test flow.
   tasks:
-  - id: 7
+  - id: 74
+    type: s3_copy
+    name: New S3CopyOperatorFactory
+    description: New S3CopyOperatorFactory
+    config:
+      verify: true
+      aws_conn_id: aws_default
+      dest_bucket_key: test
+      dest_bucket_name: test
+      source_bucket_key: test
+      source_bucket_name: test
+    sequence: 1
+  - id: 75
     type: s3_list
-    name: delete1
-    description: delete1
+    name: New S3ListOperatorFactory
+    description: New S3ListOperatorFactory
     config:
-      bucket: 's3-tst'
+      verify: true
+      aws_conn_id: aws_default
+      bucket: test
     sequence: 1
-  - id: 8
-    type: s3_list
-    name: list1
-    description: list1
+  - id: 76
+    type: s3_copy
+    name: New S3CopyOperatorFactory
+    description: New S3CopyOperatorFactory
     config:
-      bucket: 's3-test'
-    sequence: 1
-  - id: 9
-    type: bash
-    name: bash1
-    description: bash1
-    config:
-      bash_command: 'echo test'
-    sequence: 1
+      verify: true
+      aws_conn_id: aws_default
+      dest_bucket_key: test
+      dest_bucket_name: test
+      source_bucket_key: test
+      source_bucket_name: test
+    sequence: 2
   dependencies:
-  - from: 7
-    to: 8
+  - from: 74
+    to: 75
     type: success
     condition: null
-  - from: 8
-    to: 9
+  - from: 75
+    to: 76
     type: success
     condition: null
 metadata:
-  created_at: '2025-04-20T00:42:23.759480'
-  updated_at: '2025-04-20T00:42:23.759480'
+  created_at: '2025-05-07T18:48:36.647420'
+  updated_at: '2025-05-07T18:48:36.647420'
   version: '1.0'
   engine: airflow
