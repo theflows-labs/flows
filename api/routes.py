@@ -23,11 +23,27 @@ def get_flows():
 @flow_bp.route('/<flow_id>', methods=['GET'])
 def get_flow(flow_id):
     flow = FlowService.get_flow(flow_id)
-    return jsonify(flow)
+    if flow:
+        return jsonify(flow)
+    return jsonify({'error': 'Flow not found'}), 404
+
+@flow_bp.route('/<flow_id>/analyze', methods=['GET'])
+def analyze_flow(flow_id):
+    """Analyze a flow and return YAML with build logs."""
+    try:
+        logger.info(f"Received analyze request for flow: {flow_id}")
+        analysis = FlowService.analyze_flow(flow_id)
+        return jsonify(analysis)
+    except ValueError as ve:
+        logger.error(f"Validation error analyzing flow {flow_id}: {str(ve)}")
+        return jsonify({'error': str(ve)}), 404
+    except Exception as e:
+        logger.error(f"Error analyzing flow {flow_id}: {str(e)}")
+        return jsonify({'error': f"Failed to analyze flow: {str(e)}"}), 500
 
 @flow_bp.route('/', methods=['POST'])
 def create_flow():
-    data = request.json
+    data = request.get_json()
     flow = FlowService.create_flow(data)
     return jsonify(flow), 201
 

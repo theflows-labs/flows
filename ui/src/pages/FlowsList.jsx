@@ -20,6 +20,8 @@ import {
   InputAdornment,
   MenuItem,
   Switch,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -31,6 +33,8 @@ import {
   FilterList as FilterIcon,
   Download as DownloadIcon,
   PowerSettingsNew as PowerIcon,
+  Analytics as AnalyticsIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import useFlowStore from '../stores/flowStore';
 
@@ -47,6 +51,10 @@ const FlowsList = () => {
   const [selectedFlow, setSelectedFlow] = useState(null);
   const [toggleConfirmOpen, setToggleConfirmOpen] = useState(false);
   const [toggleAction, setToggleAction] = useState(null);
+  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
+  const [selectedFlowForAnalysis, setSelectedFlowForAnalysis] = useState(null);
+  const [analysisResults, setAnalysisResults] = useState(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
 
   useEffect(() => {
     fetchFlows();
@@ -99,6 +107,34 @@ const FlowsList = () => {
     }
   };
 
+  const handleAnalyzeClick = async (flow) => {
+    setSelectedFlowForAnalysis(flow);
+    setAnalysisDialogOpen(true);
+    setAnalysisLoading(true);
+    setAnalysisResults(null); // Reset previous results
+    
+    try {
+      const response = await fetch(`/api/flows/${flow.flow_id}/analyze`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze flow');
+      }
+      const results = await response.json();
+      console.log('Analysis results:', results); // Debug log
+      setAnalysisResults(results);
+    } catch (error) {
+      console.error('Error analyzing flow:', error);
+      setAnalysisResults({ 
+        error: error.message,
+        logs: 'Error occurred during analysis',
+        yaml: '',
+        status: 'error'
+      });
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
+
   const filteredFlows = flows.filter(flow => {
     // Search term filter
     const matchesSearch = flow.flow_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -122,6 +158,101 @@ const FlowsList = () => {
     
     return matchesSearch && matchesStatus && matchesDateRange;
   });
+
+  const AnalysisDialog = ({ open, onClose, flow, analysis, loading, error }) => {
+    if (!open) return null;
+
+    return (
+      <Dialog 
+        open={open} 
+        onClose={onClose}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Flow Analysis: {flow?.name || flow?.flow_id}
+          <IconButton
+            aria-label="close"
+            onClick={onClose}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : error ? (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          ) : analysis ? (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                Analysis Logs
+              </Typography>
+              <Paper 
+                variant="outlined" 
+                sx={{ 
+                  p: 2, 
+                  mb: 3,
+                  backgroundColor: '#f5f5f5',
+                  maxHeight: '300px',
+                  overflow: 'auto',
+                  fontFamily: 'monospace',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word'
+                }}
+              >
+                {analysis.logs ? (
+                  <pre style={{ margin: 0 }}>{analysis.logs}</pre>
+                ) : (
+                  'No logs available'
+                )}
+              </Paper>
+
+              <Typography variant="h6" gutterBottom>
+                Generated YAML
+              </Typography>
+              <Paper 
+                variant="outlined" 
+                sx={{ 
+                  p: 2,
+                  backgroundColor: '#f5f5f5',
+                  maxHeight: '400px',
+                  overflow: 'auto',
+                  fontFamily: 'monospace',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word'
+                }}
+              >
+                {analysis.yaml ? (
+                  <pre style={{ margin: 0 }}>{analysis.yaml}</pre>
+                ) : (
+                  'No YAML available'
+                )}
+              </Paper>
+
+              {analysis.status === 'error' && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {analysis.error}
+                </Alert>
+              )}
+            </Box>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    );
+  };
 
   return (
     <Box sx={{ p: 3 }}>
@@ -216,6 +347,14 @@ const FlowsList = () => {
                 </Box>
               </CardContent>
               <CardActions sx={{ justifyContent: 'flex-end' }}>
+                <Tooltip title="Analyze Flow">
+                  <IconButton 
+                    size="small"
+                    onClick={() => handleAnalyzeClick(flow)}
+                  >
+                    <AnalyticsIcon />
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title={flow.is_active ? "Deactivate Flow" : "Activate Flow"}>
                   <IconButton 
                     size="small"
@@ -359,6 +498,20 @@ const FlowsList = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Analysis Results Dialog */}
+      <AnalysisDialog
+        open={analysisDialogOpen}
+        onClose={() => {
+          setAnalysisDialogOpen(false);
+          setSelectedFlowForAnalysis(null);
+          setAnalysisResults(null);
+        }}
+        flow={selectedFlowForAnalysis}
+        analysis={analysisResults}
+        loading={analysisLoading}
+        error={analysisResults?.error}
+      />
     </Box>
   );
 };

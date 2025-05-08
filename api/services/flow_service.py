@@ -1,8 +1,11 @@
 from typing import Dict, List, Optional, Any
 from core.repositories.repository import FlowConfigurationRepository, TaskConfigurationRepository
 from core.models.models import FlowConfiguration, TaskConfiguration
+from orchestration.airflow_plugin.plugin_core.dag_builder.yaml_builder import YAMLDAGBuilder
 import yaml
 import logging
+import tempfile
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -242,4 +245,124 @@ class FlowService:
             }
         except Exception as e:
             logger.error(f"Error getting flow statistics: {str(e)}")
-            raise 
+            raise
+
+    @classmethod
+    def analyze_flow(cls, flow_id: str) -> Dict[str, Any]:
+        """Analyze a flow and generate YAML with detailed logs."""
+        # Set up log capture
+        log_capture = []
+        class LogCaptureHandler(logging.Handler):
+            def emit(self, record):
+                log_capture.append(self.format(record))
+
+        # Configure the logger
+        dag_logger = logging.getLogger('yaml_dag_builder')
+        handler = LogCaptureHandler()
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        dag_logger.addHandler(handler)
+        dag_logger.setLevel(logging.INFO)
+
+        try:
+            dag_logger.info(f"Starting flow analysis for flow_id: {flow_id}")
+            service = cls()
+            
+            # Get flow configuration
+            flow = service.flow_repo.get_flow_config_by_flow_id(flow_id)
+            if not flow:
+                dag_logger.error(f"Flow not found: {flow_id}")
+                raise ValueError(f"Flow not found: {flow_id}")
+
+            dag_logger.info(f"Found flow configuration for {flow_id}, fetching tasks...")
+            # Get tasks with dependencies
+            tasks = service.task_repo.get_task_configs_by_flow_config_with_dependencies(flow.config_id)
+            if not tasks:
+                dag_logger.warning(f"No tasks found for flow: {flow_id}")
+            
+            # Build task dependencies
+            task_dependencies = []
+            for task in tasks:
+                for dep in task.dependencies:
+                    task_dependencies.append({
+                        'from': dep.task_id,
+                        'to': dep.depends_on_task_id,
+                        'type': dep.dependency_type,
+                        'condition': dep.condition
+                    })
+
+            dag_logger.info(f"Building YAML structure for flow: {flow_id}")
+            # Build YAML structure
+            yaml_structure = {
+                'version': '1.0',
+                'flow': {
+                    'id': flow.flow_id,
+                    'description': flow.description or '',
+                    'tasks': [{
+                        'id': task.task_id,
+                        'type': task.task_type,
+                        'name': task.description or f'Task {task.task_sequence}',
+                        'description': task.description or '',
+                        'config': task.config_details or {},
+                        'sequence': task.task_sequence
+                    } for task in tasks],
+                    'dependencies': task_dependencies
+                },
+                'metadata': {
+                    'created_at': flow.created_dt.isoformat() if flow.created_dt else None,
+                    'updated_at': flow.updated_dt.isoformat() if flow.updated_dt else None,
+                    'version': '1.0',
+                    'engine': 'airflow'
+                }
+            }
+
+            # Convert to YAML
+            yaml_content = yaml.dump(yaml_structure, default_flow_style=False)
+            dag_logger.info(f"Generated YAML for flow: {flow_id}")
+
+            # Create a temporary YAML file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as temp_file:
+                temp_file.write(yaml_content)
+                temp_file_path = temp_file.name
+
+            try:
+                # Initialize YAML DAG Builder with the temporary file path
+                dag_logger.info(f"Initializing DAG builder for flow: {flow_id}")
+                dag_builder = YAMLDAGBuilder(yaml_path=temp_file_path)
+                
+                try:
+                    dag_logger.info(f"Building DAG for flow: {flow_id}")
+                    # Build DAG
+                    dag = dag_builder.build()
+                    build_logs = '\n'.join(log_capture)
+                    dag_logger.info(f"Successfully built DAG for flow: {flow_id}")
+                    
+                    return {
+                        'yaml': yaml_content,
+                        'logs': build_logs,
+                        'status': 'success'
+                    }
+                except Exception as e:
+                    build_logs = '\n'.join(log_capture)
+                    dag_logger.error(f"Error building DAG for flow {flow_id}: {str(e)}")
+                    return {
+                        'yaml': yaml_content,
+                        'logs': build_logs,
+                        'status': 'error',
+                        'error': str(e)
+                    }
+            finally:
+                # Clean up the temporary file
+                try:
+                    os.unlink(temp_file_path)
+                    dag_logger.info(f"Cleaned up temporary file: {temp_file_path}")
+                except Exception as e:
+                    dag_logger.warning(f"Failed to delete temporary file {temp_file_path}: {str(e)}")
+        except ValueError as ve:
+            dag_logger.error(f"Validation error for flow {flow_id}: {str(ve)}")
+            raise
+        except Exception as e:
+            dag_logger.error(f"Unexpected error analyzing flow {flow_id}: {str(e)}")
+            raise
+        finally:
+            # Remove log handler
+            dag_logger.removeHandler(handler) 
