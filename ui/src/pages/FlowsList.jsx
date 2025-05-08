@@ -162,6 +162,11 @@ const FlowsList = () => {
   const AnalysisDialog = ({ open, onClose, flow, analysis, loading, error }) => {
     if (!open) return null;
 
+    const formatValidationError = (error) => {
+      if (typeof error === 'string') return error;
+      return `Task ${error.task_id} (${error.type}): ${error.issues.join(', ')}`;
+    };
+
     return (
       <Dialog 
         open={open} 
@@ -216,6 +221,72 @@ const FlowsList = () => {
                   'No logs available'
                 )}
               </Paper>
+
+              {analysis.validation_errors && analysis.validation_errors.length > 0 && (
+                <>
+                  <Typography variant="h6" gutterBottom color="error">
+                    Validation Errors
+                  </Typography>
+                  <Paper 
+                    variant="outlined" 
+                    sx={{ 
+                      p: 2, 
+                      mb: 3,
+                      backgroundColor: '#fff3f3',
+                      maxHeight: '200px',
+                      overflow: 'auto',
+                      fontFamily: 'monospace',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word'
+                    }}
+                  >
+                    {analysis.validation_errors.map((error, index) => (
+                      <Typography 
+                        key={index} 
+                        color="error" 
+                        sx={{ mb: 1 }}
+                      >
+                        {formatValidationError(error)}
+                      </Typography>
+                    ))}
+                  </Paper>
+                </>
+              )}
+
+              {analysis.metrics && (
+                <>
+                  <Typography variant="h6" gutterBottom>
+                    Validation Metrics
+                  </Typography>
+                  <Paper 
+                    variant="outlined" 
+                    sx={{ 
+                      p: 2, 
+                      mb: 3,
+                      backgroundColor: '#f5f5f5'
+                    }}
+                  >
+                    <Grid container spacing={2}>
+                      <Grid item xs={3}>
+                        <Typography variant="subtitle2">Total Tasks:</Typography>
+                        <Typography>{analysis.metrics.total_tasks}</Typography>
+                      </Grid>
+                      <Grid item xs={3}>
+                        <Typography variant="subtitle2" color="success.main">Valid Tasks:</Typography>
+                        <Typography color="success.main">{analysis.metrics.valid_tasks}</Typography>
+                      </Grid>
+                      <Grid item xs={3}>
+                        <Typography variant="subtitle2" color="warning.main">Tasks with Warnings:</Typography>
+                        <Typography color="warning.main">{analysis.metrics.warning_tasks}</Typography>
+                      </Grid>
+                      <Grid item xs={3}>
+                        <Typography variant="subtitle2" color="error.main">Tasks with Errors:</Typography>
+                        <Typography color="error.main">{analysis.metrics.error_tasks}</Typography>
+                      </Grid>
+                    </Grid>
+                  </Paper>
+                </>
+              )}
 
               <Typography variant="h6" gutterBottom>
                 Generated YAML

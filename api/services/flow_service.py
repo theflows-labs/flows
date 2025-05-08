@@ -331,24 +331,136 @@ class FlowService:
                 
                 try:
                     dag_logger.info(f"Building DAG for flow: {flow_id}")
-                    # Build DAG
-                    dag = dag_builder.build()
-                    build_logs = '\n'.join(log_capture)
-                    dag_logger.info(f"Successfully built DAG for flow: {flow_id}")
                     
-                    return {
-                        'yaml': yaml_content,
-                        'logs': build_logs,
-                        'status': 'success'
-                    }
+                    # Validate tasks by attempting to build the DAG
+                    dag_logger.info("Starting DAG validation...")
+                    try:
+                        dag = dag_builder.build()
+                        dag_logger.info("Successfully validated and built DAG")
+
+                        # Additional task validation after DAG build
+                        dag_logger.info("\n=== Task Validation Metrics ===")
+                        task_metrics = []
+                        
+                        # Get all tasks from the DAG
+                        dag_tasks = dag.tasks
+                        dag_logger.info(f"Found {len(dag_tasks)} tasks in the DAG")
+                        
+                        # Build a mapping from task_id to original config
+                        task_config_map = {str(t.task_id): t for t in tasks}
+                        dag_task_ids = {str(getattr(t, 'task_id', None) or getattr(t, 'task_id', None)) for t in dag_tasks}
+                        
+                        # First, check for tasks that failed to be created in the DAG
+                        missing_tasks = set(task_config_map.keys()) - dag_task_ids
+                        if missing_tasks:
+                            dag_logger.error(f"Found {len(missing_tasks)} tasks that failed to be created in the DAG:")
+                            for task_id in missing_tasks:
+                                orig_task = task_config_map[task_id]
+                                error_msg = f"Task {task_id} ({orig_task.task_type}) failed to be created in the DAG"
+                                dag_logger.error(error_msg)
+                                task_metrics.append({
+                                    'task_id': task_id,
+                                    'type': orig_task.task_type,
+                                    'status': 'error',
+                                    'issues': [error_msg]
+                                })
+
+                        # Then validate the tasks that were successfully created
+                        for dag_task in dag_tasks:
+                            dag_task_id = str(getattr(dag_task, 'task_id', None) or getattr(dag_task, 'task_id', None))
+                            orig_task = task_config_map.get(dag_task_id)
+                            config_details = orig_task.config_details if orig_task else {}
+
+                            task_metric = {
+                                'task_id': dag_task_id,
+                                'type': getattr(dag_task, 'task_type', None) or (orig_task.task_type if orig_task else None),
+                                'status': 'valid',
+                                'issues': []
+                            }
+
+                            if not config_details:
+                                task_metric['issues'].append("Missing configuration details")
+                                task_metric['status'] = 'warning'
+
+                            # Example: s3_list required fields
+                            if task_metric['type'] == 's3_list':
+                                required_fields = ['bucket', 'prefix']
+                                for field in required_fields:
+                                    if field not in config_details:
+                                        task_metric['issues'].append(f"Missing required field: {field}")
+                                        task_metric['status'] = 'error'
+
+                            # Add task metric to list
+                            task_metrics.append(task_metric)
+                            
+                            # Log task validation results
+                            if task_metric['status'] == 'valid':
+                                dag_logger.info(f"Task {task_metric['task_id']} ({task_metric['type']}): Valid")
+                            elif task_metric['status'] == 'warning':
+                                dag_logger.warning(f"Task {task_metric['task_id']} ({task_metric['type']}): {', '.join(task_metric['issues'])}")
+                            else:
+                                dag_logger.error(f"Task {task_metric['task_id']} ({task_metric['type']}): {', '.join(task_metric['issues'])}")
+                        
+                        # Add summary to logs
+                        valid_tasks = sum(1 for m in task_metrics if m['status'] == 'valid')
+                        warning_tasks = sum(1 for m in task_metrics if m['status'] == 'warning')
+                        error_tasks = sum(1 for m in task_metrics if m['status'] == 'error')
+                        
+                        dag_logger.info("\n=== Validation Summary ===")
+                        dag_logger.info(f"Total tasks: {len(task_metrics)}")
+                        dag_logger.info(f"Valid tasks: {valid_tasks}")
+                        dag_logger.info(f"Tasks with warnings: {warning_tasks}")
+                        dag_logger.info(f"Tasks with errors: {error_tasks}")
+                        if missing_tasks:
+                            dag_logger.error(f"Failed to create {len(missing_tasks)} tasks in the DAG")
+                        
+                        build_logs = '\n'.join(log_capture)
+                        
+                        return {
+                            'yaml': yaml_content,
+                            'logs': build_logs,
+                            'status': 'success' if error_tasks == 0 else 'warning',
+                            'validation_errors': [m for m in task_metrics if m['status'] != 'valid'],
+                            'metrics': {
+                                'total_tasks': len(task_metrics),
+                                'valid_tasks': valid_tasks,
+                                'warning_tasks': warning_tasks,
+                                'error_tasks': error_tasks
+                            }
+                        }
+                    except Exception as e:
+                        error_msg = f"Error building DAG: {str(e)}"
+                        dag_logger.error(error_msg)
+                        build_logs = '\n'.join(log_capture)
+                        
+                        # Try to extract task-specific errors from the build error
+                        validation_errors = []
+                        if hasattr(e, 'args') and len(e.args) > 0:
+                            error_str = str(e.args[0])
+                            # Look for task-specific error patterns
+                            for task in tasks:
+                                if task.task_id in error_str or task.task_type in error_str:
+                                    validation_errors.append(f"Error in task {task.task_id} ({task.task_type}): {error_str}")
+                        
+                        if not validation_errors:
+                            validation_errors = [error_msg]
+                        
+                        return {
+                            'yaml': yaml_content,
+                            'logs': build_logs,
+                            'status': 'error',
+                            'error': 'DAG validation failed',
+                            'validation_errors': validation_errors
+                        }
                 except Exception as e:
                     build_logs = '\n'.join(log_capture)
-                    dag_logger.error(f"Error building DAG for flow {flow_id}: {str(e)}")
+                    dag_logger.error(f"Error during DAG building: {str(e)}")
                     return {
                         'yaml': yaml_content,
                         'logs': build_logs,
                         'status': 'error',
-                        'error': str(e)
+                        'error': str(e),
+                        'validation_errors': [str(e)]
                     }
             finally:
                 # Clean up the temporary file
