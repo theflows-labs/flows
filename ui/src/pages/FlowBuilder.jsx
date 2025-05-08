@@ -129,7 +129,13 @@ const FlowBuilder = () => {
         label: `New ${taskType.name}`,
         type: typeKey,
         config: taskType.defaultConfig || {},
-        task_id: null // Initialize task_id as null for new nodes
+        task_id: null, // Initialize task_id as null for new nodes
+        onConfigClick: (nodeData) => {
+          setSelectedNode({
+            id: newNode.id,
+            data: nodeData
+          });
+        }
       },
     };
     setNodes((nds) => [...nds, newNode]);

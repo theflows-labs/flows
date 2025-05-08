@@ -111,19 +111,28 @@ const TaskConfigForm = ({ taskConfig, onSave, onCancel }) => {
     }
   };
 
-  const renderField = (field, schema) => {
-    const value = formData[field] || '';
-    const error = errors[field];
-    const isRequired = schema.required?.includes(field);
+  const renderField = (fieldName, schema) => {
+    const value = formData[fieldName] || '';
+    const error = errors[fieldName];
+    const isRequired = taskType.config_schema.required?.includes(fieldName);
 
     return (
-      <Grid item xs={12} key={field}>
+      <Grid item xs={12} key={fieldName}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
           <TextField
             fullWidth
-            label={`${schema.title || field}${isRequired ? ' *' : ''}`}
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {schema.title || fieldName}
+                {isRequired && (
+                  <Typography component="span" sx={{ color: 'error.main' }}>
+                    *
+                  </Typography>
+                )}
+              </Box>
+            }
             value={value}
-            onChange={handleChange(field)}
+            onChange={handleChange(fieldName)}
             error={!!error}
             helperText={error || schema.description}
             required={isRequired}

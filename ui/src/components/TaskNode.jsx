@@ -1,17 +1,36 @@
 import { memo } from 'react';
 import { Handle, Position } from 'reactflow';
-import { Paper, Typography } from '@mui/material';
+import { Box, Typography, IconButton, Tooltip } from '@mui/material';
+import { Settings as SettingsIcon } from '@mui/icons-material';
+import { useTaskTypeStore } from '../stores/taskTypeStore';
+
+const checkNodeValidity = (node, taskTypes) => {
+  const taskType = taskTypes.find(type => type.type_key === node.data.type);
+  if (!taskType || !taskType.config_schema) return false;
+
+  const requiredFields = taskType.config_schema.required || [];
+  const configDetails = node.data.config || {};
+
+  return requiredFields.every(field => {
+    const value = configDetails[field];
+    return value !== undefined && value !== null && value !== '';
+  });
+};
 
 const TaskNode = memo(({ data }) => {
+  const { taskTypes } = useTaskTypeStore();
+  const isValid = checkNodeValidity({ data }, taskTypes);
+
   return (
-    <Paper
-      elevation={3}
+    <Box
       sx={{
         padding: 2,
-        minWidth: 150,
-        backgroundColor: '#fff',
-        border: '1px solid #ddd',
         borderRadius: 1,
+        backgroundColor: 'background.paper',
+        border: '1px solid',
+        borderColor: 'divider',
+        minWidth: 150,
+        position: 'relative'
       }}
     >
       <Handle
@@ -19,16 +38,48 @@ const TaskNode = memo(({ data }) => {
         position={Position.Top}
         style={{ background: '#555' }}
       />
-      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+        <Typography variant="subtitle2" noWrap sx={{ flex: 1 }}>
+          {data.label}
+        </Typography>
+        <Tooltip title={isValid ? "All required fields are filled" : "Some required fields are missing"}>
+          <Box
+            sx={{
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              backgroundColor: isValid ? 'success.main' : 'error.main',
+              flexShrink: 0
+            }}
+          />
+        </Tooltip>
+        <Tooltip title="Configure Task">
+          <IconButton 
+            size="small" 
+            onClick={(e) => {
+              e.stopPropagation();
+              data.onConfigClick?.(data);
+            }}
+            sx={{ 
+              ml: 1,
+              '&:hover': {
+                backgroundColor: 'action.hover'
+              }
+            }}
+          >
+            <SettingsIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Box>
+      <Typography variant="caption" color="text.secondary" display="block">
         {data.type}
       </Typography>
-      <Typography variant="body2">{data.label}</Typography>
       <Handle
         type="source"
         position={Position.Bottom}
         style={{ background: '#555' }}
       />
-    </Paper>
+    </Box>
   );
 });
 
