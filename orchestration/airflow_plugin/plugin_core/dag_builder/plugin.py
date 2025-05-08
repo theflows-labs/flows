@@ -18,23 +18,24 @@ class TheFlowsPlugin(AirflowPlugin):
     def __init__(self):
         """Initialize the plugin."""
         super().__init__()
-        self.dag_loader = DAGLoader()
+        #self.dag_loader = DAGLoader()
     
     def on_load(self):
         """
+        Only needed when db is used to store DAGs.
         Called when the plugin is loaded.
         
         This method is called by Airflow when the plugin is loaded.
         It discovers operator factories and loads DAGs from the database.
         """
         # Discover operator factories
-        self.dag_loader.discover_operator_factories("plugins.aws.athena.operators")
-        self.dag_loader.discover_operator_factories("plugins.aws.s3.operators")
+        # self.dag_loader.discover_operator_factories("plugins.aws.athena.operators")
+        # self.dag_loader.discover_operator_factories("plugins.aws.s3.operators")
         
-        # Load DAGs
-        dags = self.dag_loader.load_dags()
+        # # Load DAGs
+        # dags = self.dag_loader.load_dags()
         
-        # Add DAGs to the DagBag
-        dagbag = DagBag(dag_folder=None, include_examples=False)
-        for dag_id, dag in dags.items():
-            dagbag.dags[dag_id] = dag 
+        # # Add DAGs to the DagBag
+        # dagbag = DagBag(dag_folder=None, include_examples=False)
+        # for dag_id, dag in dags.items():
+        #     dagbag.dags[dag_id] = dag 
