@@ -6,6 +6,9 @@ node_modules/
 # Testing
 coverage/
 
+# Testing
+plugin_extracted/
+
 # Production
 build/
 dist/
