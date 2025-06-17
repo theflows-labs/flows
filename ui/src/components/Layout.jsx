@@ -35,6 +35,7 @@ function Layout({ children }) {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Flows', icon: <ListIcon />, path: '/flows' },
     { text: 'New Flow', icon: <AddIcon />, path: '/flows/new' },
+    { text: 'YAML Flow Builder', icon: <AddIcon />, path: '/flows/yaml' },
     { text: 'Task Types', icon: <ExtensionIcon />, path: '/task-types' },
   ];
 
